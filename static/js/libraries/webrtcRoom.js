@@ -1,8 +1,9 @@
 'use strict';
 
-var share = require('ep_wrtc_heading/static/js/clientShare');
-var textChat = require('ep_wrtc_heading/static/js/textChat');
-var videoChat = require('ep_wrtc_heading/static/js/videoChat');
+// var share = require('ep_wrtc_heading/static/js/clientShare');
+// var textChat = require('ep_wrtc_heading/static/js/textChat');
+// var videoChat = require('ep_wrtc_heading/static/js/videoChat');
+// new comment so wat?
 
 var WRTC_Room = (function WRTC_Room() {
 	var self = null;
@@ -11,7 +12,39 @@ var WRTC_Room = (function WRTC_Room() {
 	var VIDEOCHATLIMIT = 0;
 	// var $lastJoinButton = null;
 	var prefixHeaderId = 'headingTagId_';
-	var hElements = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', '.h1', '.h2', '.h3', '.h4', '.h5', '.h6'];
+	var hElements = "h1,h2,h3,h4,h5,h6,.h1,.h2,.h3,.h4,.h5,.h6";
+
+
+	function postAceInit(hook, context, webSocket, docId) {
+		socket = webSocket;
+		padId = docId;
+		VIDEOCHATLIMIT = clientVars.webrtc.videoChatLimit;
+
+		socket.on('userJoin', function (data, roomInfo, target) {
+			if (target === 'video') {
+				videoChat.gateway_userJoin(data, roomInfo, false);
+			} else {
+				textChat.addUserToRoom(data, roomInfo, target);
+			}
+		});
+
+		socket.on('userLeave', function (data, roomInfo, target) {
+			if (target === 'video') {
+				videoChat.gateway_userLeave(data, roomInfo, target);
+			} else {
+				textChat.removeUserFromRoom(data, roomInfo, target);
+			}
+		});
+
+		activeEventListener();
+
+		// check if there is a join request in URI queryString
+		// TODO: befre check this, the tags must be ready
+		setTimeout(function () {
+			joinByQueryString();
+		}, 500);
+	}
+
 
 	/** --------- Helper --------- */
 
@@ -250,12 +283,11 @@ var WRTC_Room = (function WRTC_Room() {
 			$box.css({left: offset.left - width  + 'px',top: offset.top + 4 + 'px'}).toggleClass('active');
 		});
 
-		$(document).on('click', '#wrtc_settings .btn_close', function click() {
-			$('#wrtc_settings').toggleClass('active');
-		});
+		
 	}
 
 	self = {
+		postAceInit: postAceInit,
 		getHeaderRoomX: getHeaderRoomX,
 		aceSetAuthorStyle: function aceSetAuthorStyle(context) {
 			if (context.author) {
@@ -275,35 +307,6 @@ var WRTC_Room = (function WRTC_Room() {
 		bulkUpdateRooms: function bulkUpdateRooms(hTagList) {
 			videoChat.bulkUpdateRooms(hTagList);
 			textChat.bulkUpdateRooms(hTagList);
-		},
-		postAceInit: function postAceInit(hook, context, webSocket, docId) {
-			socket = webSocket;
-			padId = docId || window.pad.getPadId();
-
-			VIDEOCHATLIMIT = clientVars.webrtc.videoChatLimit;
-
-			socket.on('userJoin', function (data, roomInfo, target) {
-				if (target === 'video') {
-					videoChat.gateway_userJoin(data, roomInfo, false);
-				} else {
-					textChat.addUserToRoom(data, roomInfo, target);
-				}
-			});
-
-			socket.on('userLeave', function (data, roomInfo, target) {
-				if (target === 'video') {
-					videoChat.gateway_userLeave(data, roomInfo, target);
-				} else {
-					textChat.removeUserFromRoom(data, roomInfo, target);
-				}
-			});
-
-			activeEventListener();
-
-			// check if there is a join request in URI queryString
-			setTimeout(function () {
-				joinByQueryString();
-			}, 500);
 		},
 		adoptHeaderYRoom: function adoptHeaderYRoom() {
 			// Set all video_heading to be inline with their target REP
@@ -329,29 +332,33 @@ var WRTC_Room = (function WRTC_Room() {
 		},
 		findTags: function findTags() {
 			var hTagList = [];
-			var hTagElements = hElements.join(',');
+			var hTagElements = hElements;
 			var hTags = share.$body_ace_outer().find('iframe').contents().find('#innerdocbody').children('div').children(hTagElements);
 			var aceInnerOffset = share.$body_ace_outer().find('iframe[name="ace_inner"]').offset();
 			var target = share.$body_ace_outer().find('#outerdocbody');
 			var newHTagAdded = false;
+
 			$(hTags).each(function createWrtcRoomBox() {
 				var $el = $(this);
-				var lineNumber = $el.parent().prevAll().length;
-				var tag = $el.prop('tagName').toLowerCase();
+				// var lineNumber = $el.parent().prevAll().length;
+				// var tag = $("#title")[0].tagName.toLowerCase();
 				var newY = getHeaderRoomY($el);
 				var newX = Math.ceil(aceInnerOffset.left);
-				var linkText = $el.text();
 				var headingTagId = $el.find('span').attr('class');
 				headingTagId = /(?:^| )headingTagId_([A-Za-z0-9]*)/.exec(headingTagId);
-				if (!headingTagId) return true;
+
+				if (!headingTagId) {
+					console.warn("[wrtc]: couldn't find headingTagId.")
+					return true;
+				}
 
 				var data = {
 					headingTagId: headingTagId[1],
-					tag: tag,
+					// tag: tag,
 					positionTop: newY,
 					positionLeft: newX,
-					headTitle: linkText,
-					lineNumber: lineNumber,
+					headTitle: $el.text(),
+					// lineNumber: lineNumber,
 					videoChatLimit: VIDEOCHATLIMIT
 				};
 
@@ -363,10 +370,8 @@ var WRTC_Room = (function WRTC_Room() {
 				if (target.find('#' + data.headingTagId).length <= 0) {
 					var box = $('#wertc_roomBox').tmpl(data);
 					target.find('#wbrtc_chatBox').append(box);
-
 					var avatarBox = $('#wertc_inlineAvatar').tmpl(data);
 					target.find('#wbrtc_avatarCol').append(avatarBox);
-
 					newHTagAdded = true;
 				} else {
 					$(document).find('[data-headid=' + data.headingTagId + '].wrtc_text .wrtc_roomLink, #werc_toolbar p[data-id=' + data.headingTagId + ']').text(data.headTitle);
@@ -376,9 +381,6 @@ var WRTC_Room = (function WRTC_Room() {
 
 				hTagList.push(data);
 			});
-
-			// clientVars.plugins.plugins.ep_wrtc_heading_room = hTagList;
-
 			// if a new h tag addedd check all heading again!
 			if (newHTagAdded) {
 				self.bulkUpdateRooms(hTagList);

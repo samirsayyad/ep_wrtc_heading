@@ -5,14 +5,13 @@
 			"pre": ["ep_etherpad-lite/webaccess", "ep_page_view/page_view"],
 			"post": ["ep_etherpad-lite/static"],
 			"client_hooks": {
-				"postAceInit": "ep_wrtc_heading/static/js/index",
 				"collectContentPre": "ep_wrtc_heading/static/js/shared",
+				"postAceInit": "ep_wrtc_heading/static/js/index",
 				"aceAttribsToClasses": "ep_wrtc_heading/static/js/index",
 				"aceEditorCSS": "ep_wrtc_heading/static/js/index",
 				"aceEditEvent": "ep_wrtc_heading/static/js/index",
 				"aceSetAuthorStyle": "ep_wrtc_heading/static/js/index",
 				"userLeave": "ep_wrtc_heading/static/js/index",
-				"handleClientMessage_RTC_MESSAGE": "ep_wrtc_heading/static/js/index",
 				"aceSelectionChanged": "ep_wrtc_heading/static/js/index",
 				"aceInitialized": "ep_wrtc_heading/static/js/index",
 				"chatNewMessage": "ep_wrtc_heading/static/js/index"
@@ -22,8 +21,7 @@
 				"eejsBlock_scripts": "ep_wrtc_heading/index",
 				"eejsBlock_mySettings": "ep_wrtc_heading/index",
 				"eejsBlock_styles": "ep_wrtc_heading/index",
-				"clientVars": "ep_wrtc_heading/index",
-				"handleMessage": "ep_wrtc_heading/index"
+				"clientVars": "ep_wrtc_heading/index"
 			}
 		}
 	]

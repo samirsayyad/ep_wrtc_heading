@@ -3,12 +3,7 @@
 var $ = require('ep_etherpad-lite/static/js/rjquery').$;
 var _ = require('ep_etherpad-lite/static/js/underscore');
 var randomString = require('ep_etherpad-lite/static/js/pad_utils').randomString;
-var events = require('ep_wrtc_heading/static/js/copyPasteEvents');
-var textChat = require('ep_wrtc_heading/static/js/textChat');
-var videoChat = require('ep_wrtc_heading/static/js/videoChat');
 
-// var _require = require('ep_etherpad-lite/static/js/pad');
-// var pad = _require.pad;
 
 /** **********************************************************************/
 /*                              Plugin                                  */
@@ -92,6 +87,7 @@ function getSocket() {
 
 var hooks = {
 	postAceInit: function postAceInit(hook, context) {
+
 		if (!$('#editorcontainerbox').hasClass('flex-layout')) {
 			$.gritter.add({
 				title: 'Error',
@@ -101,6 +97,7 @@ var hooks = {
 			});
 		}
 
+		// TODO: use/replace Rest api to get this
 		// Bridge into the ep_profiles
 		window.clientVars.ep_profile_list = {};
 		getSocket().on('message', function message(obj) {
@@ -124,7 +121,12 @@ var hooks = {
 
 		var socket = EPwrtcHeading.init(ace, padId, userId);
 
-		WRTC.postAceInit(hook, context);
+		// TODO: make sure the priority of these components are in line
+		// TODO: make sure clientVars contain all data that's necessary
+
+		if(!clientVars.userId || !clientVars.padId) throw new Error("[wrtc]: clientVars doesn't exists");
+
+		WRTC.postAceInit(hook, context, socket, padId);
 		WRTC_Room.postAceInit(hook, context, socket, padId);
 		videoChat.postAceInit(hook, context, socket, padId);
 		textChat.postAceInit(hook, context, socket, padId);
@@ -181,10 +183,8 @@ var hooks = {
 	},
 	userLeave: function userLeave(hook, context, callback) {
 		WRTC_Room.userLeave(context, callback);
-		WRTC.userLeave(hook, context, callback);
-	},
-	handleClientMessage_RTC_MESSAGE: function handleClientMessage_RTC_MESSAGE(hook, context) {
-		WRTC.handleClientMessage_RTC_MESSAGE(hook, context);
+		console.log("etherpad user leave")
+		// WRTC.userLeave(hook, context, callback);
 	},
 	aceSelectionChanged: function aceSelectionChanged(rep, context) {
 		if (context.callstack.type === 'insertheading') {
@@ -229,7 +229,6 @@ exports.aceAttribsToClasses = hooks.aceAttribsToClasses;
 exports.aceEditEvent = hooks.aceEditEvent;
 exports.aceSetAuthorStyle = hooks.aceSetAuthorStyle;
 exports.userLeave = hooks.userLeave;
-exports.handleClientMessage_RTC_MESSAGE = hooks.handleClientMessage_RTC_MESSAGE;
 exports.aceSelectionChanged = hooks.aceSelectionChanged;
 exports.aceInitialized = hooks.aceInitialized;
 exports.chatNewMessage = hooks.chatNewMessage;

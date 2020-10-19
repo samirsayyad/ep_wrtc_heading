@@ -134,10 +134,18 @@ const socketDisconnect = (data) => {
 	return result
 }
 
+const getUserInHeader = (padId, headerId) => {
+	const roomKey = `${padId}:${headerId}`;
+	if(!rooms[roomKey]) return [];
+
+	return rooms[roomKey].map(x => x.userId);
+}
+
 module.exports = {
 	socketUserJoin, 
 	socketBulkUpdateRooms,
 	socketUserLeave,
 	socketDisconnect,
+	getUserInHeader
 
 }

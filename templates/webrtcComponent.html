@@ -1,4 +1,7 @@
-<script src="../static/plugins/ep_wrtc_heading/static/js/jquery.tmpl.min.js"></script>
+
+
+
+
 
 <script id="wrtc_textChatBox" type="text/html">
 	<div id="wrtc_textChatWrapper" data-id="${headerId}">
@@ -160,8 +163,12 @@
 
 	<div id="wrtc_settings">
 		<button class="btn_close"><i class="buttonicon close-btn"></i></button>
-		<h2 style="color: #7f8794;margin-bottom: 15px;">Camera Settings</h2>
+		<button class="btn_info"><i class="buttonicon buttonicon-tasks"></i></button>
 
+		<h2 style="color: #7f8794;margin-bottom: 15px;">Settings</h2>
+<div style="display: flex;flex-direction: row;">
+
+	<div>
     <div class="select">
 			<label for="audioSource">Audio input source: </label><select id="audioSource"></select>
 		</div>
@@ -171,5 +178,8 @@
 		<div class="select">
 				<label for="videoSource">Video source: </label><select id="videoSource"></select>
 		</div>
+	</div>
+	<div class="wrtc_info"> There is no one in this room </div>
+</div>
 	</div><!-- wrtc_settings -->
 </script>

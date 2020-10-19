@@ -98,6 +98,34 @@ You can see metrics for various errors that users have when attempting to connec
 * `ep_webrtc_err_Unknown`: Some other unspecified error. Perhaps a bug in this plugin.
 
 
+## Development
+
+we use gulp to build minify and developong plugin
+
+```bash
+yarn start # run gulp watch for development
+yarn build # build files for development
+yarn build:prod # build sorce for profuction
+```
+
+## changelog
+
+
+### [v0.30.0]:
+  - bring up Gulp, to organize development workflow
+  - create gulp tasks for development and production flow
+  - priorityies js file loading, to prevent varibale assign missing
+  - minify and concate js files
+  - remove socket dependency on etherpad socket chanel (now on we can boot up webrtc socket in diffrent server)
+  - optimize 'findTags' function performance
+  - user leave now happend imidiatly, video interface remove imidiatly
+  - update webrtc adaptor [80fbefb](https://github.com/webrtcHacks/adapter/tree/80fbefb4355046d899d7f78cfd41cd09942677d1)
+  - chose vidoe codec
+  - remove streaming when close room
+  - make sure call strategy happend for the user are in header id
+  - 
+
+
 
 ## License
 This project is licensed under the [MIT License](./LICENSE).

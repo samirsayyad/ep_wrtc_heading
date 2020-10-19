@@ -1,4 +1,5 @@
-static/js/adapter.js
-static/js/getUserMediaPolyfill.js
+static/js/libraries/adapter.js
+static/js/libraries/getUserMediaPolyfill.js
 static/js/jquery.tmpl.min.js
+static/js/wrtc.heading.mini.js
 server

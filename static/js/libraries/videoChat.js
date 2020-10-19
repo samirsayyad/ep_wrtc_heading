@@ -1,5 +1,5 @@
 'use strict';
-var share = require('ep_wrtc_heading/static/js/clientShare');
+// var share = require('ep_wrtc_heading/static/js/clientShare');
 
 var videoChat = (function videoChat() {
 	var socket = null;
@@ -42,7 +42,7 @@ var videoChat = (function videoChat() {
 		});
 	}
 
-	function stopStreaming(stream) {
+	function stopStreaming(stream, userId) {
 		if (stream) {
 			stream.getTracks().forEach(function stopStream(track) {
 				track.stop();
@@ -94,7 +94,7 @@ var videoChat = (function videoChat() {
 		if (data.userId === clientVars.userId) {
 			$headingRoom.removeAttr('data-video');
 			share.roomBoxIconActive();
-			WRTC.deactivate(data.userId, data.headerId);
+			
 			window.headerId = null;
 
 			currentRoom = {};
@@ -104,7 +104,9 @@ var videoChat = (function videoChat() {
 				opacity: 0
 			}).attr({ 'data-active': false });
 
+			WRTC.deactivate(data.userId, data.headerId);
 			stopStreaming(localStream);
+			localStream = null
 			socket.removeListener('receiveTextMessage:' + data.headerId);
 		}
 
@@ -113,6 +115,8 @@ var videoChat = (function videoChat() {
 		share.wrtcPubsub.emit('update store', data, headerId, 'LEAVE', 'VIDEO', roomInfo, function updateStore() {});
 
 		share.wrtcPubsub.emit('enable room buttons', headerId, 'LEAVE', $joinBtn);
+
+		WRTC.userLeave(data.userId)
 	}
 
 	function addUserToRoom(data, roomInfo) {
@@ -197,8 +201,8 @@ var videoChat = (function videoChat() {
 	function createSession(headerId, userInfo, $joinButton) {
 		share.$body_ace_outer().find('button.btn_joinChat_chatRoom').removeClass('active');
 		$joinBtn = $joinButton;
-		isUserMediaAvailable().then(function joining(stream) {
-			localStream = stream;
+		// isUserMediaAvailable().then(function joining(stream) {
+			localStream = null;
 
 			if (!currentRoom.userId) {
 				return socket.emit('userJoin', padId, userInfo, 'video', gateway_userJoin);
@@ -209,14 +213,14 @@ var videoChat = (function videoChat() {
 					socket.emit('userJoin', padId, userInfo, 'video', gateway_userJoin);
 				});
 			});
-		})['catch'](function (err) {
-			console.error(err);
-			share.wrtcPubsub.emit('enable room buttons', headerId, 'LEAVE', $joinBtn);
-			socket.emit('userLeave', padId, currentRoom, 'video', function userLeave(_userData, roomInfo) {
-				gateway_userLeave(_userData, roomInfo);
-			});
-			WRTC.showUserMediaError(err);
-		});
+		// })['catch'](function (err) {
+		// 	console.error(err);
+		// 	share.wrtcPubsub.emit('enable room buttons', headerId, 'LEAVE', $joinBtn);
+		// 	socket.emit('userLeave', padId, currentRoom, 'video', function userLeave(_userData, roomInfo) {
+		// 		gateway_userLeave(_userData, roomInfo);
+		// 	});
+		// 	WRTC.showUserMediaError(err);
+		// });
 
 	}
 
@@ -339,4 +343,4 @@ var videoChat = (function videoChat() {
 	};
 })();
 
-module.exports = videoChat;
+// module.exports = videoChat;
