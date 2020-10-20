@@ -254,6 +254,7 @@ var videoChat = (function videoChat() {
 	}
 
 	function reachedVideoRoomSize(roomInfo, showAlert, isBulkUpdate) {
+		console.log(VIDEOCHATLIMIT, roomInfo)
 		if (roomInfo && roomInfo.present <= VIDEOCHATLIMIT) return true;
 
 		showAlert = showAlert || true;

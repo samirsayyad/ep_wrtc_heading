@@ -7,8 +7,8 @@ const sourcemaps = require('gulp-sourcemaps');
 const jsfiles = [
 
 	"./static/js/libraries/lib/adapter.js",
-	// "./static/js/libraries/lib/RTCMultiConnection.min.js",
-	// "./static/js/libraries/lib/getHTMLMediaElement.js",
+	"./static/js/libraries/lib/RTCMultiConnection.min.js",
+	"./static/js/libraries/lib/getHTMLMediaElement.js",
 	"./static/js/libraries/lib/tinyqueue.min.js",
 
 	"./static/js/libraries/CodecsHandler.js",

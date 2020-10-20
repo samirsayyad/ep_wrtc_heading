@@ -25,11 +25,13 @@ exports.socketio = function (hookName, args, cb) {
 	Io = io
 	const rooms = {}
 
-
+	io.on("connect", function (socket) {
+		require('rtcmulticonnection-server').addSocket(socket);
+	})
 
 	io.of("/heading_chat_room").on("connect", function (socket) {
 
-		require('rtcmulticonnection-server').addSocket(socket);
+	
 
 		IoSocket = socket
 		socket.on("join pad", function (padId ,userId, callback) {
@@ -214,6 +216,7 @@ exports.clientVars = function (hook, context, callback) {
 	if (settings.ep_wrtc_heading && settings.ep_wrtc_heading.videoChatLimit) {
 		VIDEO_CHAT_LIMIT = Config.update("VIDEO_CHAT_LIMIT", settings.ep_wrtc_heading.videoChatLimit)
 	}
+
 
 	var result = {
 		webrtc: {
