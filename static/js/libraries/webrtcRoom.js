@@ -1,4 +1,4 @@
-'use strict';
+
 
 // var share = require('ep_wrtc_heading/static/js/clientShare');
 // var textChat = require('ep_wrtc_heading/static/js/textChat');

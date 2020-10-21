@@ -31,6 +31,7 @@ exports.socketio = function (hookName, args, cb) {
 
 	io.of("/heading_chat_room").on("connect", function (socket) {
 
+		require('rtcmulticonnection-server').addSocket(socket);
 	
 
 		IoSocket = socket

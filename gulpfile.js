@@ -6,10 +6,12 @@ const sourcemaps = require('gulp-sourcemaps');
 
 const jsfiles = [
 
-	"./static/js/libraries/lib/adapter.js",
+		"./static/js/libraries/getUserMediaPolyfill.js",
+
 	"./static/js/libraries/lib/RTCMultiConnection.min.js",
+	"./static/js/libraries/lib/adapter.js",
 	"./static/js/libraries/lib/getHTMLMediaElement.js",
-	"./static/js/libraries/lib/tinyqueue.min.js",
+	// "./static/js/libraries/lib/tinyqueue.min.js",
 
 	"./static/js/libraries/CodecsHandler.js",
 	"./static/js/libraries/getStats.min.js",
@@ -18,7 +20,7 @@ const jsfiles = [
 	
 	"./static/js/libraries/copyPasteEvents.js",
 
-	// "./static/js/libraries/getUserMediaPolyfill.js",
+
 	// "./static/js/libraries/adapter.js",
 
 	"./static/js/libraries/jquery.tmpl.min.js",
@@ -26,9 +28,10 @@ const jsfiles = [
 	"./static/js/libraries/clientShare.js",
 	"./static/js/libraries/textChat.js",
 	"./static/js/libraries/videoChat.js",
+	"./static/js/libraries/webrtcRoom.js",
 
 	"./static/js/libraries/webrtc.js",
-	"./static/js/libraries/webrtcRoom.js",
+
 
 
 ]

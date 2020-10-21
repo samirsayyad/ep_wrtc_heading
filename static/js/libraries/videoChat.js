@@ -28,15 +28,15 @@ var videoChat = (function videoChat() {
 				if (deviceInfo.kind === 'audioinput') {
 					option.text = deviceInfo.label || 'microphone ' + (audioInputSelect.length + 1);
 					if (videoSettings.microphone === deviceInfo.deviceId) option.selected = true;
-					audioInputSelect.appendChild(option);
+					// audioInputSelect.appendChild(option);
 				} else if (deviceInfo.kind === 'audiooutput') {
 					option.text = deviceInfo.label || 'speaker ' + (audioOutputSelect.length + 1);
 					if (videoSettings.speaker === deviceInfo.deviceId) option.selected = true;
-					audioOutputSelect.appendChild(option);
+					// audioOutputSelect.appendChild(option);
 				} else if (deviceInfo.kind === 'videoinput') {
 					option.text = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
 					if (videoSettings.camera === deviceInfo.deviceId) option.selected = true;
-					videoSelect.appendChild(option);
+					// videoSelect.appendChild(option);
 				}
 			}
 		});

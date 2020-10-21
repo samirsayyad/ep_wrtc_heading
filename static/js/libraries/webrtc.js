@@ -41,24 +41,22 @@ var WRTC = (function WRTC() {
 	var enlargedVideos = new Set();
 	var localVideoElement = null;
 	var gState = null
-	var streamId = null
-
-	var joinBefore = false;
-	var connection = null
-
-	var sessionId = null
-
-	var RTCTTTSSSCOOO = function () {
+	var connection 
 
 
+	const initRTConnection = function () {
+		
 
 
-		 connection = new RTCMultiConnection();
+			
 
-		//  connection.connect();
+		connection = new RTCMultiConnection();
 
-		// connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
-		connection.socketURL = '/';
+		// by default, socket.io server is assumed to be deployed on your own URL
+		// connection.socketURL = '/';
+
+		// comment-out below line if you do not have your own socket.io server
+		connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
 
 		connection.socketMessageEvent = 'video-conference-demo';
 
@@ -81,12 +79,12 @@ var WRTC = (function WRTC() {
 		if (resolutions == 'HD') {
 			videoConstraints = {
 				width: {
-					ideal: 300
+					ideal: 1280
 				},
 				height: {
-					ideal: 200
+					ideal: 720
 				},
-				frameRate: 10
+				frameRate: 30
 			};
 		}
 
@@ -157,8 +155,11 @@ var WRTC = (function WRTC() {
 			]
 		}];
 
+		connection.videosContainer = $(document).find('#wrtc_modal .videoWrapper');
+
 
 		connection.onstream = function (event) {
+			console.log("1111111")
 			var existing = document.getElementById(event.streamid);
 			if (existing && existing.parentNode) {
 				existing.parentNode.removeChild(existing);
@@ -187,68 +188,53 @@ var WRTC = (function WRTC() {
 					video.setAttribute('muted', true);
 				}
 			}
-			localStream = event.stream
-			streamId = event.streamid
 			video.srcObject = event.stream;
 
 			// var width = parseInt(connection.videosContainer.clientWidth / 3) - 20;
 			// var mediaElement = getHTMLMediaElement(video, {
-			// 		title: event.userid,
-			// 		buttons: ['full-screen'],
-			// 		width: width,
-			// 		showOnMouseEnter: false
+			// 	title: event.userid,
+			// 	buttons: ['full-screen'],
+			// 	width: width,
+			// 	showOnMouseEnter: false
 			// });
 
-			console.log(connection.videosContainer)
-			$(connection.videosContainer).append(
+			console.log("okay nowwww")
+			connection.videosContainer.append(
 				$(video).css({
-					"width": "200px",
-					"height": "160px"
+					width: "180px"
 				}).attr({
 					id: event.streamid
 				})
+			)
+			// connection.videosContainer.appendChild(
 
-			);
+			// );
 
-			// setTimeout(function() {
-			// 	video.media.play();
+			// setTimeout(function () {
+			// 	mediaElement.media.play();
 			// }, 5000);
 
 			// mediaElement.id = event.streamid;
 
 			// to keep room-id in cache
-			// localStorage.setItem(connection.socketMessageEvent, connection.sessionid);
+			localStorage.setItem(connection.socketMessageEvent, connection.sessionid);
 
 			// chkRecordConference.parentNode.style.display = 'none';
-
-
-
-
 
 
 		};
 
 
+
 		connection.onstreamended = function (event) {
-
-			console.log("---------------------------------------------------22222")
-			console.log(event)
-			console.log(connection)
-			console.log(connection.streamEvents.selectAll())
-
-			if (event.type === "local") {
-				joinBefore = true
-			}
-
-			console.log("---------------------------------------------------22222")
 			var mediaElement = document.getElementById(event.streamid);
-			if (mediaElement && event.type === "remote") {
+			if (mediaElement) {
 				mediaElement.parentNode.removeChild(mediaElement);
 			}
 		};
 
 		connection.onMediaError = function (e) {
-			console.log("onMediaError=>>>", e)
+			console.log(e)
 			if (e.message === 'Concurrent mic process limit.') {
 				if (DetectRTC.audioInputDevices.length <= 1) {
 					alert('Please select external microphone. Check github issue number 483.');
@@ -263,157 +249,11 @@ var WRTC = (function WRTC() {
 				connection.join(connection.sessionid);
 			}
 		};
-
-
-
-
-		var sessions = {};
-		connection.onNewSession = function (session) {
-
-			console.log(session, "sessionsessionsessionsession")
-
-			if (sessions[session.sessionid]) return;
-			sessions[session.sessionid] = session;
-
-			var tr = document.createElement('tr');
-			tr.innerHTML = '<td><strong>' + session.extra['session-name'] + '</strong> is running a conference!</td>' +
-				'<td><button class="join">Join</button></td>';
-			roomsList.insertBefore(tr, roomsList.firstChild);
-
-			var joinRoomButton = tr.querySelector('.join');
-			joinRoomButton.setAttribute('data-sessionid', session.sessionid);
-			joinRoomButton.onclick = function () {
-				this.disabled = true;
-
-				var sessionid = this.getAttribute('data-sessionid');
-				session = sessions[sessionid];
-
-				if (!session) throw 'No such session exists.';
-
-				connection.join(session);
-			};
-		};
-
-	
-
-
-
 	}
-
-
-	var dddd = function () {
-		var videosContainer = document.querySelector('#wrtc_modal .videoWrapper') || document.body;
-
-		connection = new RTCMultiConnection();
-
-	 // https://github.com/muaz-khan/WebRTC-Experiment/tree/master/socketio-over-nodejs
-	 var SIGNALING_SERVER = 'https://socketio-over-nodejs2.herokuapp.com:443/';
-
-	 connection.openSignalingChannel = function (config) {
-		 var channel = config.channel || connection.channel || 'default-namespace';
-		 var sender = Math.round(Math.random() * 9999999999) + 9999999999;
-
-		 io.connect(SIGNALING_SERVER).emit('new-channel', {
-			 channel: channel,
-			 sender: sender
-		 });
-
-		 var socket = io.connect(SIGNALING_SERVER + channel);
-		 socket.channel = channel;
-
-		 socket.on('connect', function () {
-			 if (config.callback) config.callback(socket);
-		 });
-
-		 socket.send = function (message) {
-			 socket.emit('message', {
-				 sender: sender,
-				 data: message
-			 });
-		 };
-
-		 socket.on('message', config.onmessage);
-	 };
-
-
-	 connection.onstream = function (e) {
-		 e.mediaElement.width = 300;
-		 videosContainer.appendChild(e.mediaElement, videosContainer.firstChild);
-		 // rotateVideo(e.mediaElement);
-		 // scaleVideos();
-
-		 document.getElementById('leave-conference').disabled = false;
-	 };
-
-
-
-	 connection.onstreamended = function (e) {
-		 e.mediaElement.style.opacity = 0;
-		 rotateVideo(e.mediaElement);
-		 setTimeout(function () {
-			 if (e.mediaElement.parentNode) {
-				 e.mediaElement.parentNode.removeChild(e.mediaElement);
-			 }
-			 scaleVideos();
-		 }, 1000);
-	 };
-
-
-
-	 
-	 var sessions = {};
-	 connection.onNewSession = function (session) {
-		 if (sessions[session.sessionid]) return;
-		 sessions[session.sessionid] = session;
-
-		 console.log(session.sessionid, "session.sessionidsession.sessionidsession.sessionid")
-
-		 // var tr = document.createElement('tr');
-		 // tr.innerHTML = '<td><strong>' + session.extra['session-name'] + '</strong> is running a conference!</td>' +
-		 // 	'<td><button class="join">Join</button></td>';
-		 // roomsList.insertBefore(tr, roomsList.firstChild);
-
-		 // var joinRoomButton = tr.querySelector('.join');
-		 // joinRoomButton.setAttribute('data-sessionid', session.sessionid);
-		 // joinRoomButton.onclick = function () {
-		 // 	this.disabled = true;
-
-		 // 	var sessionid = this.getAttribute('data-sessionid');
-		 // 	session = sessions[sessionid];
-
-		 // 	if (!session) throw 'No such session exists.';
-
-		 // 	connection.join(session);
-		 // };
-	 };
-	}
-
-	// create an empty priority queue
-var queue = new TinyQueue();
-
-	var queue = [];
-
-	share.wrtcPubsub.on('WebRTC call', function(data){
-		console.log('WebRTC call')
-		var userId = data.userId
-		var headerId = data.headerId
-
-		//put value on end of queue
-		queue.push(data);
-
-	})
-
-	share.wrtcPubsub.on('WebRTC accept new call', function(data){
-		console.log('WebRTC accept new call')
-
-	})
 
 	function postAceInit(hook, context, webSocket, docId) {
 		padId = docId;
 		socket = webSocket;
-
-		// RTCTTTSSSCOOO()
-		dddd()
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration/iceServers
 		// Don't forget to use TURN server, The Stun server is not enough.
@@ -434,21 +274,8 @@ var queue = new TinyQueue();
 		if (clientVars.webrtc.video.sizes.small) {
 			videoSizes.small = clientVars.webrtc.video.sizes.small + 'px';
 		}
-		webSocket.on("RTC_MESSAGE", async function(context){
-
-
-
-
-			if (context.data.payload.data.headerId === window.headerId) {
-				// console.log("my oooooooofffffffff, ", context.data.payload.data.type)
-				// if(context.data.payload.data.type!=='offer'){
-					await self.receiveMessage(context.data.payload);
-				// }
-			} 
-	
-			
-	
-	
+		webSocket.on("RTC_MESSAGE", function(context){
+			if (context.data.payload.data.headerId === window.headerId) self.receiveMessage(context.data.payload);
 		})
 
 
@@ -584,55 +411,11 @@ var queue = new TinyQueue();
 
 		},
 		userLeave: function userLeave(userId) {
-			// if (userId && pc[userId]) {
-			// 	gState = "LEAVING"
-			// 	self.removeVideoInterface(userId)
-			// 	self.hangup(userId, true);
-			// }
-			sessions = {};
-
-			connection.leave();
-
-
-			  // //   // disconnect with all users
-				// 	connection.getAllParticipants().forEach(function(pid) {
-				// 		connection.disconnectWith(pid);
-				// });
-
-				// console.log("localstream", localStream)
-				// if(localStream){
-				// 	share.stopStreaming(localStream)
-				// 	localStream = null
-				// }
-				// console.log("localstream", localStream)
-				// console.log("------------------------")
-				// // console.log(connection.streamEvents.selectFirst().stream)
-				// console.log("------------------------")
-
-				// if(connection.streamEvents.selectFirst() && connection.streamEvents.selectFirst().stream)
-				// 	share.stopStreaming(connection.streamEvents.selectFirst().stream)
-
-				// connection.leave()
-
-
-				// console.log(connection.attachStreams)
-				// console.log(connection.attachStreams)
-
-
-				// connection.removeStream(streamId);
-
-				// connection.closeSocket();
-				
-
-				// stop all local cameras
-				// connection.attachStreams.forEach(function(stream) {
-				// 		stream.stop();
-				// });
-		
-				// close socket.io connection
-				
-
-				console.log(connection.streamEvents.selectAll())
+			if (userId && pc[userId]) {
+				gState = "LEAVING"
+				self.removeVideoInterface(userId)
+				self.hangup(userId, true);
+			}
 
 		},
 		show: function show() {
@@ -702,118 +485,19 @@ var queue = new TinyQueue();
 			// isActive = true;
 			// return self.getUserMedia(headerId);
 
-			// console.log(connection.streamEvents.selectAll(), "===========activate")
-			// console.log(connection, "===========activate")
 
+ 
+			if(!connection) initRTConnection()
+			console.log("open new room")
 
-			// by default, socket.io server is assumed to be deployed on your own URL
-			// connection.socketURL = '/';
-
-			// comment-out below line if you do not have your own socket.io server
-
-
-
-console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
-
-			connection.checkPresence(headerId, function(isRoomExist, roomid) {
-				if (isRoomExist === true) {
-					// this.disabled = true;
-
-					// var sessionid = this.getAttribute('data-sessionid');
-					session = sessions[headerId];
-
-					if (!session) {
-						sessionId = headerId
-					connection.extra = {
-							'session-name': 'Anonymous'
-					};
-						connection.open();
-						return false
-					}
-
-					connection.join(headerId);
-				}else{
-					connection.sessionid = headerId;
-					// this.disabled = true;
-
-					sessionId = connection.sessionid
-					connection.extra = {
-							'session-name': 'Anonymous'
-					};
-					connection.open();
+			connection.openOrJoin(headerId, function(isRoomCreated, roomid, error) {
+				if (connection.isInitiator === true) {
+						connection.open(headerId)
+				} else {
+					connection.join(headerId)
 				}
-			})
-
-
-
-
-
-
-
-
-			// connection.videosContainer = $(document).find('#wrtc_modal .videoWrapper');
-
-
-		
-			// console.log("connect again to sokcet")
-
-				
-			// connection.checkPresence(headerId, function(isRoomExist, roomid) {
-			// 	console.log(isRoomExist, roomid, "checkPresence", joinBefore)
-
-			// 	connection.sessionid(`${window.pad.getPadId()}:${headerId}`)
-
-
-			// 		if (isRoomExist === true) {
-			// 			connection.connect(headerId);
-			// 			// if(joinBefore) {
-			// 			// 	connection.rejoin(headerId);
-
-			// 			// }else {
-
-			// 			// 	connection.join(headerId);
-							
-			// 			// }
-			// 		} else {
-			// 				connection.open(headerId);
-			// 		}
-			// });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		});
+        
 
 
 		},
@@ -828,6 +512,97 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 			// 	share.stopStreaming(localStream)
 			// 	localStream = null;
 			// }
+
+			console.log(connection.getAllParticipants())
+			connection.getAllParticipants().forEach(function(pid) {
+
+					console.log(pid, "====================")
+					connection.disconnectWith(pid);
+			});
+
+
+
+
+			 // stop all local cameras
+			 connection.attachStreams.forEach(function(localStream) {
+				 console.log(localStream)
+				 if(localStream.type === 'local')	localStream.stop();
+					
+				});
+
+
+
+			 // close socket.io connection
+			 connection.closeSocket();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		},
 		toggleMuted: function toggleMuted() {
 			var audioTrack = localStream.getAudioTracks()[0];
@@ -858,7 +633,7 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 					'max-height': videoSizes.small
 				})
 				.append($('<div class="user-name">').text(user.name))
-				.append(`<p class="connectionStatus" style="color: #ffff;position: absolute;padding: 0;margin:0">connecting</p>`)
+				.append(`<p class="connectionStatus" style="color: #ffff;position: absolute;padding: 0;">connecting</p>`)
 				.appendTo($('#wrtc_modal .videoWrapper'));
 
 				video = $('<video playsinline>')
@@ -894,53 +669,16 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 		},
 		setStream: function setStream(userId, stream) {
 
-			// if (!userId) return false;
-			// var videoId = 'video_' + userId.replace(/\./g, '_');
-			// var video = $(document).find('#' + videoId)[0];
-			// if (video) $(video).parent().find('.connectionStatus').text(gState);
-
-			// if(!video){
-			// 	self.appendNewVideoInterface(userId, stream)
-			// } else {
-			// 	if(stream) attachMediaStream(video, stream);
-			// }
-
 			if (!userId) return false;
-			var isLocal = userId === share.getUserId();
 			var videoId = 'video_' + userId.replace(/\./g, '_');
-			var video = $('#' + videoId)[0];
+			var video = $(document).find('#' + videoId)[0];
+			if (video) $(video).parent().find('.connectionStatus').text(gState);
 
-			var user = share.getUserFromId(userId);
-
-			if (!video && stream) {
-				var videoContainer = $("<div class='video-container'>").css({
-					width: videoSizes.small,
-					'max-height': videoSizes.small
-				}).appendTo($('#wrtc_modal .videoWrapper'));
-
-				videoContainer.append($('<div class="user-name">').text(user.name));
-
-				video = $('<video playsinline>').attr('id', videoId).css({
-					'border-color': user.colorId,
-					width: videoSizes.small,
-					'max-height': videoSizes.small
-				}).on({
-					loadedmetadata: function loadedmetadata() {
-						self.addInterface(userId);
-					}
-				}).appendTo(videoContainer)[0];
-
-				video.autoplay = true;
-				if (isLocal) {
-					videoContainer.addClass('local-user');
-					video.muted = true;
-				}
-				self.addInterface(userId);
-			}
-			if (stream) {
-				attachMediaStream(video, stream);
-			} else if (video) {
-				$(video).parent().remove();
+			if(!video){
+				self.appendNewVideoInterface(userId, stream)
+			} else {
+				
+				if(stream) attachMediaStream(video, stream);
 			}
 			
 		},
@@ -989,15 +727,14 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 					$largeVideo.attr('title', videoEnlarged ? 'Make video smaller' : 'Make video larger').toggleClass('large', videoEnlarged);
 
 					var videoSize = $(document).find('#wrtc_modal .ndbtn.btn_enlarge').hasClass('large') ? videoSizes.large : videoSizes.small;
-					
 					$video.parent().css({ width: videoSize, 'max-height': videoSize });
 					$video.css({ width: videoSize, 'max-height': videoSize });
 				}
 			});
 
 			if($(document).find('#wrtc_modal .ndbtn.btn_enlarge').hasClass('large')){
-				$video.parent().css({ width: videoSizes.large,  });
-				$video.css({ width: videoSizes.large, });
+				$video.parent().css({ width: videoSizes.large, 'max-height': videoSizes.large });
+				$video.css({ width: videoSizes.large, 'max-height': videoSizes.large });
 			}
 
 			if(isLocal) localVideoElement = $video;
@@ -1031,94 +768,24 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 			});
 		},
 		receiveMessage: async function receiveMessage(msg) {
-			// var peer = msg.from; // userId sender
-			// var data = msg.data;
-			// var type = data.type;
-			// // ignore own messages
-			// if (peer === share.getUserId()) return;
-			// // console.log(peer, "===-===",share.getUserId(), "===", type, new Date().getSeconds())
-			
-			// if (type === 'hangup') {
-			// 	self.hangup(peer, true);
-			// } else if (type === 'offer') {
-
-				
-			// 	if (pc[peer]) {
-			// 		self.hangup(peer, true);
-			// 		self.createPeerConnection(peer, data.headerId);
-			// 	} else {
-			// 		self.createPeerConnection(peer, data.headerId);
-			// 	}
-
-			// 	var offer = new RTCSessionDescription(data.offer);
-
-			// 	await pc[peer].setRemoteDescription(offer).catch(err => logError(err, "offer:setRemoteDescription"))
-				
-			// 	if (localStream) {
-			// 		if (pc[peer].getLocalStreams) {
-			// 			if (!pc[peer].getLocalStreams().length) {
-			// 				pc[peer].addStream(localStream);
-			// 			}
-			// 		} else if (pc[peer].localStreams) {
-			// 			if (!pc[peer].localStreams.length) {
-			// 				pc[peer].addStream(localStream);
-			// 			}
-			// 		}
-			// 	}
-
-
-				
-			// 	let desc = await pc[peer].createAnswer(sdpConstraints).catch((err) => logError(err, "offer:createAnswer"))
-				
-			// 	desc.sdp = cleanupSdp(desc.sdp);
-
-			// 	await pc[peer].setLocalDescription(desc).catch((err) => logError(err, "offer:setLocalDescription"))
-
-			// 	self.sendMessage(peer, { type: 'answer', answer: desc, userId: msg.from, headerId: data.headerId });
-			// 	console.log("Now You can have new connection33333")
-			// } else if (type === 'answer') {
-			// 	//  console.log(type, "============", peer)
-			// 	if (pc[peer]) {
-			// 		// console.log(data, "================")
-			// 		var answer = new RTCSessionDescription(data.answer);
-			// 		await pc[peer].setRemoteDescription(answer).catch((err) => logError(err, "answer:setRemoteDescription", msg))
-			// 		console.log("Now You can have new connection22222222")
-			// 	}
-			// } else if (type === 'icecandidate') {
-			// 	if (pc[peer]) {
-			// 		if(!data.candidate) return false
-			// 		var candidate = new RTCIceCandidate(data.candidate);
-			// 		// console.log(candidate)
-			// 		await pc[peer].addIceCandidate(candidate).catch(error => {
-			// 			console.error('Error: Failure during addIceCandidate()', error);
-			// 		})
-			// 		console.log("Now You can have new connection11")
-			// 	}
-			// } else {
-			// 	console.error('unknown server message', data);
-			// }
-
-			// return true;
-			var peer = msg.from;
+			var peer = msg.from; // userId sender
 			var data = msg.data;
 			var type = data.type;
-			if (peer === share.getUserId()) {
-				// console.info('ignore own messages');
-				return;
-			}
-			/*
-      if (type != 'icecandidate')
-        console.info('receivedMessage', 'peer', peer, 'type', type, 'data', data);
-      */
+			// ignore own messages
+			if (peer === share.getUserId()) return;
+			console.log(peer, "===-===",share.getUserId(), "===", type, new Date().getSeconds())
+			
 			if (type === 'hangup') {
 				self.hangup(peer, true);
 			} else if (type === 'offer') {
+
 				if (pc[peer]) {
 					self.hangup(peer, true);
 					self.createPeerConnection(peer, data.headerId);
 				} else {
 					self.createPeerConnection(peer, data.headerId);
 				}
+
 				if (localStream) {
 					if (pc[peer].getLocalStreams) {
 						if (!pc[peer].getLocalStreams().length) {
@@ -1130,38 +797,54 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 						}
 					}
 				}
+
 				var offer = new RTCSessionDescription(data.offer);
-				pc[peer].setRemoteDescription(offer, function () {
-					pc[peer].createAnswer(function (desc) {
+
+				pc[peer].setRemoteDescription(offer)
+
+				.then(function(){
+					pc[peer].createAnswer(sdpConstraints)
+					.then(function(desc){
 						desc.sdp = cleanupSdp(desc.sdp);
-						pc[peer].setLocalDescription(desc, function () {
-							self.sendMessage(peer, { type: 'answer', answer: desc, headerId: data.headerId });
-						}, logError);
-					}, logError, sdpConstraints);
-				}, logError);
+						pc[peer].setLocalDescription(desc)
+						.then(function(){
+							self.sendMessage(peer, { type: 'answer', answer: desc, userId: msg.from, headerId: data.headerId });
+						}).catch((err) => logError(err, "offer:setLocalDescription"))
+					}).catch((err) => logError(err, "offer:createAnswer"))
+				}).catch((err) => logError(err, "offer:setRemoteDescription"))
+
 			} else if (type === 'answer') {
 				if (pc[peer]) {
 					var answer = new RTCSessionDescription(data.answer);
-					pc[peer].setRemoteDescription(answer, function () {}, logError);
+					pc[peer].setRemoteDescription(answer)
+					.then(function () {
+						console.log("doooooooooooooononononononononononononoon111", new Date().getSeconds())
+					})
+					.catch((err) => logError(err, "answer:setRemoteDescription", msg))
 				}
 			} else if (type === 'icecandidate') {
 				if (pc[peer]) {
+					if(!data.candidate) return false
 					var candidate = new RTCIceCandidate(data.candidate);
+					if(!candidate ||!pc[peer].addIceCandidate) return false
 					var p = pc[peer].addIceCandidate(candidate);
 					if (p) {
 						p.then(function () {
 							// Do stuff when the candidate is successfully passed to the ICE agent
-						})['catch'](function () {
-							console.error('Error: Failure during addIceCandidate()', data);
+						console.log("doooooooooooooononononononononononononoon22222", new Date().getSeconds())
+
+						}).catch(function () {
+							console.error('Error: Failure during addIceCandidate()');
+							// self.receiveMessage(msg)
 						});
 					}
 				}
 			} else {
-				console.error('unknown message', data);
+				console.error('unknown server message', data);
 			}
+
 		},
 		audioVideoInputChange: function audioVideoInputChange() {
-			if(!localStream) return false;
 			localStream.getTracks().forEach(function (track) {
 				track.stop();
 			});
@@ -1197,23 +880,16 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 			});
 		},
 		hangup: function hangup(userId, notify, headerId) {
-			// notify = arguments.length === 1 ? true : notify;
-			// // console.log("hangUp", userId, notify, headerId)
-			// if (pc[userId] && userId !== share.getUserId()) {
-			// 	self.removeVideoInterface(userId)
-			// 	pc[userId].close();
-			// 	delete pc[userId];
-			// 	if (notify) self.sendMessage(userId, { type: 'hangup', headerId: headerId });
-			// }
 			notify = arguments.length === 1 ? true : notify;
+			console.log("hangUp", userId, notify, headerId)
 			if (pc[userId] && userId !== share.getUserId()) {
-				self.setStream(userId, '');
+				self.removeVideoInterface(userId)
 				pc[userId].close();
 				delete pc[userId];
 				if (notify) self.sendMessage(userId, { type: 'hangup', headerId: headerId });
 			}
 		},
-		createPeerConnection: function createPeerConnection(userId, headerId, targetCreate) {
+		createPeerConnection: function createPeerConnection(userId, headerId) {
 			if (pc[userId]) console.warn('WARNING creating PC connection even though one exists', userId);
 			// if((pc[userId])) return false
 
@@ -1223,20 +899,7 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 				if (event.candidate) {
 					self.appendNewVideoInterface(userId)
 					self.sendMessage(userId, {type: 'icecandidate', headerId: headerId, candidate: event.candidate});
-				} else {
-					// socket.emit('openForCalling', window.pad.getPadId(), window.headerId)
-					console.log("now you can have newconnnection44444444444444444444")
-			
 				}
-			};
-
-			if(targetCreate === 'local'){
-				
-			}
-
-			pc[userId].ontrack = function(event) {
-				remoteStream[userId] = event.stream;
-				self.setStream(userId, event.stream);
 			};
 
 			pc[userId].onaddstream = function (event) {
@@ -1258,30 +921,21 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 			// https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/createOffer#RTCOfferOptions_dictionary
 			constraints = mergeConstraints(constraints, sdpConstraints);
 
-			if (!pc[userId]) self.createPeerConnection(userId, headerId, 'local');
+			if (!pc[userId]) self.createPeerConnection(userId, headerId);
 			
 			pc[userId].addStream(localStream);
 
-			pc[userId].addEventListener("negotiationneeded", ev => {
-
-				pc[userId].createOffer(constraints)
-				.then(function(desc) {
-					desc.sdp = cleanupSdp(desc.sdp);
-					return pc[userId].setLocalDescription(desc)
-				})
-				.then(function (){
-				// if (userId !== share.getUserId() ) {
-					
-					// }
-					self.sendMessage(userId, { type: 'offer', offer: pc[userId].localDescription, headerId: headerId });			
-				}).then(function(){
-					
-				})
-				.catch((err) => logError(err, "call:createOffer"));
-
+			pc[userId].createOffer(constraints)
+			.then(function(desc) {
+				desc.sdp = cleanupSdp(desc.sdp);
+				return pc[userId].setLocalDescription(desc)
 			})
-
-
+			.then(function (){
+				self.sendMessage(userId, { type: 'offer', offer: pc[userId].localDescription, headerId: headerId });			
+			}).then(function(){
+				
+			})
+			.catch((err) => logError(err, "call:createOffer"));
 		},
 		getUserMedia: function getUserMedia(headerId) {
 			audioInputSelect = document.querySelector('select#audioSource');
@@ -1323,39 +977,20 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 				// create video stream for current pc
 				self.appendNewVideoInterface(share.getUserId(), stream)
 
-				
-				// socket.emit('canMakeACall', window.pad.getPadId(),  window.headerId, function(canI){
-					// console.log("canIcanIcanIcanIcanI", canI)
-					// if(canI === null) {
-					// 	socket.emit('openForCalling', window.pad.getPadId(), window.headerId)
-					// 	canI = true
-					// }
+				socket.emit('getHeaderUserlist', padId, headerId, function(userList){
+					userList.forEach(function (userId) {
+						if (userId !== share.getUserId() ) {
+							if (pc[userId] && gState === "RECONNECTING") {
+								self.hangup(userId, null, headerId);
+							}
+							// make a call, and get streem connection for the other user are in room
 
-					// if(canI){
+							// socket.emit("makeCall", padId, userId, headerId)
 
-						socket.emit('getHeaderUserlist', padId, window.headerId, function(userList){
-							userList.forEach(function (userId) {
-								if (userId !== share.getUserId() ) {
-									// if (pc[userId] && gState === "RECONNECTING") {
-									// 	self.hangup(userId, null, headerId);
-									// }
-									self.call(userId, headerId);
-								}
-								// else {
-								// 	if(userList.length > 1)
-								// 		socket.emit('closeForCalling', window.pad.getPadId(), window.headerId)
-
-								// }
-							});
-						
-						})
-
-					// }else{
-					
-					// 	// console.log("canIcanIcanIcanIcanIcanIcanIcanI", canI)
-					// }
-				// })
-
+							self.call(userId, headerId);
+						}
+					});
+				})
 			})
 			.catch(function (err) {
 				self.showUserMediaError(err);
@@ -1366,7 +1001,6 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 	// Normalize RTC implementation between browsers
 	// var getUserMedia = window.navigator.mediaDevices.getUserMedia
 	var attachMediaStream = function attachMediaStream(element, stream) {
-		console.log(stream)
 		if (!stream){
 			console.error("[wrtc]: stream is not exists.", stream)
 			return false;
@@ -1416,32 +1050,17 @@ console.log("sessionidsessionidsessionid0",sessionId , connection.sessionid)
 
 	function logError(error, functionName, data) {
 		// attempt to reconnect
-		console.log(error, functionName, data, "=========logError")
+		console.log(error, functionName, data)
 		if(error && error.message.includes("Failed to set remote answer sdp")){
 			console.log("Try reconnecting")
-			//setTimeout(() => {
+			setTimeout(() => {
 				console.log("reconnecting...")
 				// self.receiveMessage(data)
 				gState = "RECONNECTING"
-				// share.stopStreaming(localStream)
-				// self.getUserMedia(window.headerId)
-
-
-				// socket.emit('getHeaderUserlist', window.pad.getPadId(), window.headerId, function(userList){
-				// 	userList.forEach(function (userId) {
-				// 		if (userId !== share.getUserId() ) {
-				// 			if (pc[userId]) {
-				// 				self.hangup(userId, null, headerId);
-				// 			}
-				// 			self.call(userId, window.headerId);
-				// 		}
-				// 	});
-				// });
-
-
+				self.getUserMedia(window.headerId)
 
 				// $(document).find("#wrtc_modal .btn_reload.btn_roomHandler").trigger("click")
-			//}, 100);
+			}, 5000);
 		}
 		
 		console.error('WebRTC ERROR:', error);
