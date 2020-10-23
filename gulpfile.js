@@ -9,7 +9,8 @@ const jsfiles = [
 		"./static/js/libraries/getUserMediaPolyfill.js",
 
 	"./static/js/libraries/lib/RTCMultiConnection.min.js",
-	"./static/js/libraries/lib/adapter.js",
+	"./static/js/libraries/adapter.js",
+	// "./static/js/libraries/lib/adapter.js",
 	"./static/js/libraries/lib/getHTMLMediaElement.js",
 	// "./static/js/libraries/lib/tinyqueue.min.js",
 
@@ -21,7 +22,7 @@ const jsfiles = [
 	"./static/js/libraries/copyPasteEvents.js",
 
 
-	// "./static/js/libraries/adapter.js",
+	
 
 	"./static/js/libraries/jquery.tmpl.min.js",
 	

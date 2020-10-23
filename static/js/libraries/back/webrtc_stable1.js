@@ -15,7 +15,6 @@
  */
 'use strict';
 
-
 var WRTC = (function WRTC() {
 	var padId = null;
 	var socket = null;
@@ -42,26 +41,221 @@ var WRTC = (function WRTC() {
 	var enlargedVideos = new Set();
 	var localVideoElement = null;
 	var gState = null
+	var connection 
 
-	// create an empty priority queue
-// var queue = new TinyQueue();
 
-	var queue = [];
+	const initRTConnection = function () {
+		
 
-	share.wrtcPubsub.on('WebRTC call', function(data){
-		console.log('WebRTC call')
-		var userId = data.userId
-		var headerId = data.headerId
 
-		//put value on end of queue
-		queue.push(data);
+			
 
-	})
+		connection = new RTCMultiConnection();
 
-	share.wrtcPubsub.on('WebRTC accept new call', function(data){
-		console.log('WebRTC accept new call')
+		// by default, socket.io server is assumed to be deployed on your own URL
+		// connection.socketURL = '/';
 
-	})
+		// comment-out below line if you do not have your own socket.io server
+		connection.socketURL = 'https://rtcmulticonnection.herokuapp.com:443/';
+
+		connection.socketMessageEvent = 'video-conference-demo';
+
+		connection.session = {
+			audio: true,
+			video: true
+		};
+
+		connection.sdpConstraints.mandatory = {
+			OfferToReceiveAudio: true,
+			OfferToReceiveVideo: true
+		};
+
+		// STAR_FIX_VIDEO_AUTO_PAUSE_ISSUES
+		// via: https://github.com/muaz-khan/RTCMultiConnection/issues/778#issuecomment-524853468
+		var bitrates = 128;
+		var resolutions = 'Ultra-HD';
+		var videoConstraints = {};
+
+		if (resolutions == 'HD') {
+			videoConstraints = {
+				width: {
+					ideal: 1280
+				},
+				height: {
+					ideal: 720
+				},
+				frameRate: 30
+			};
+		}
+
+		if (resolutions == 'Ultra-HD') {
+			videoConstraints = {
+				width: {
+					ideal: 1920
+				},
+				height: {
+					ideal: 1080
+				},
+				frameRate: 30
+			};
+		}
+
+		connection.mediaConstraints = {
+			video: videoConstraints,
+			audio: true
+		};
+
+		var CodecsHandler = connection.CodecsHandler;
+
+		connection.processSdp = function (sdp) {
+			var codecs = 'vp9';
+
+			if (codecs.length) {
+				sdp = CodecsHandler.preferCodec(sdp, codecs.toLowerCase());
+			}
+
+			if (resolutions == 'HD') {
+				sdp = CodecsHandler.setApplicationSpecificBandwidth(sdp, {
+					audio: 128,
+					video: bitrates,
+					screen: bitrates
+				});
+
+				sdp = CodecsHandler.setVideoBitrates(sdp, {
+					min: bitrates * 8 * 1024,
+					max: bitrates * 8 * 1024,
+				});
+			}
+
+			if (resolutions == 'Ultra-HD') {
+				sdp = CodecsHandler.setApplicationSpecificBandwidth(sdp, {
+					audio: 128,
+					video: bitrates,
+					screen: bitrates
+				});
+
+				sdp = CodecsHandler.setVideoBitrates(sdp, {
+					min: bitrates * 8 * 1024,
+					max: bitrates * 8 * 1024,
+				});
+			}
+
+			return sdp;
+		};
+		// END_FIX_VIDEO_AUTO_PAUSE_ISSUES
+
+		// https://www.rtcmulticonnection.org/docs/iceServers/
+		// use your own TURN-server here!
+		connection.iceServers = [{
+			'urls': [
+				'stun:stun.l.google.com:19302',
+				'stun:stun1.l.google.com:19302',
+				'stun:stun2.l.google.com:19302',
+				'stun:stun.l.google.com:19302?transport=udp',
+			]
+		},
+		{
+				url: 'turn:numb.viagenie.ca',
+				credential: 'muazkh',
+				username: 'webrtc@live.com'
+		}
+	];
+
+		connection.videosContainer = $(document).find('#wrtc_modal .videoWrapper');
+
+
+		connection.onstream = function (event) {
+			console.log("1111111")
+			var existing = document.getElementById(event.streamid);
+			if (existing && existing.parentNode) {
+				existing.parentNode.removeChild(existing);
+			}
+
+			event.mediaElement.removeAttribute('src');
+			event.mediaElement.removeAttribute('srcObject');
+			event.mediaElement.muted = true;
+			event.mediaElement.volume = 0;
+
+			var video = document.createElement('video');
+
+			try {
+				video.setAttributeNode(document.createAttribute('autoplay'));
+				video.setAttributeNode(document.createAttribute('playsinline'));
+			} catch (e) {
+				video.setAttribute('autoplay', true);
+				video.setAttribute('playsinline', true);
+			}
+
+			if (event.type === 'local') {
+				video.volume = 0;
+				try {
+					video.setAttributeNode(document.createAttribute('muted'));
+				} catch (e) {
+					video.setAttribute('muted', true);
+				}
+			}
+			video.srcObject = event.stream;
+
+			// var width = parseInt(connection.videosContainer.clientWidth / 3) - 20;
+			// var mediaElement = getHTMLMediaElement(video, {
+			// 	title: event.userid,
+			// 	buttons: ['full-screen'],
+			// 	width: width,
+			// 	showOnMouseEnter: false
+			// });
+
+			console.log("okay nowwww")
+			connection.videosContainer.append(
+				$(video).css({
+					width: "180px"
+				}).attr({
+					id: event.streamid
+				})
+			)
+			// connection.videosContainer.appendChild(
+
+			// );
+
+			// setTimeout(function () {
+			// 	mediaElement.media.play();
+			// }, 5000);
+
+			// mediaElement.id = event.streamid;
+
+			// to keep room-id in cache
+			localStorage.setItem(connection.socketMessageEvent, connection.sessionid);
+
+			// chkRecordConference.parentNode.style.display = 'none';
+
+
+		};
+
+
+
+		connection.onstreamended = function (event) {
+			var mediaElement = document.getElementById(event.streamid);
+			if (mediaElement) {
+				mediaElement.parentNode.removeChild(mediaElement);
+			}
+		};
+
+		connection.onMediaError = function (e) {
+			console.log(e)
+			if (e.message === 'Concurrent mic process limit.') {
+				if (DetectRTC.audioInputDevices.length <= 1) {
+					alert('Please select external microphone. Check github issue number 483.');
+					return;
+				}
+
+				var secondaryMic = DetectRTC.audioInputDevices[1].deviceId;
+				connection.mediaConstraints.audio = {
+					deviceId: secondaryMic
+				};
+
+				connection.join(connection.sessionid);
+			}
+		};
+	}
 
 	function postAceInit(hook, context, webSocket, docId) {
 		padId = docId;
@@ -69,23 +263,14 @@ var WRTC = (function WRTC() {
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration/iceServers
 		// Don't forget to use TURN server, The Stun server is not enough.
-		pcConfig.iceServers = [
-		{'urls': [
+		pcConfig.iceServers = [{
+			'urls': [
 				'stun:stun.l.google.com:19302',
 				'stun:stun1.l.google.com:19302',
 				'stun:stun2.l.google.com:19302',
-				'stun:stun.l.google.com:19302?transport=udp',,
-				"stun:130.185.122.49:3478"
+				'stun:stun.l.google.com:19302?transport=udp',
 			]
-		},
-		{url: ["turn:130.185.122.49:3478"], credential: "docsplus", username: "strongPassword"},
-		{
-				url: 'turn:numb.viagenie.ca',
-				credential: 'muazkh',
-				username: 'webrtc@live.com'
-		},
-		{url: "turn:turn.anyfirewall.com:443?transport=tcp", credential: "webrtc", username: "webrtc"}
-		];
+		}];
 
 		if(clientVars.webrtc && clientVars.webrtc.iceServers) pcConfig.iceServers = clientVars.webrtc.iceServers;
 
@@ -95,21 +280,8 @@ var WRTC = (function WRTC() {
 		if (clientVars.webrtc.video.sizes.small) {
 			videoSizes.small = clientVars.webrtc.video.sizes.small + 'px';
 		}
-		webSocket.on("RTC_MESSAGE", async function(context){
-
-
-
-
-			if (context.data.payload.data.headerId === window.headerId) {
-				// console.log("my oooooooofffffffff, ", context.data.payload.data.type)
-				// if(context.data.payload.data.type!=='offer'){
-					await self.receiveMessage(context.data.payload);
-				// }
-			} 
-	
-			
-	
-	
+		webSocket.on("RTC_MESSAGE", function(context){
+			if (context.data.payload.data.headerId === window.headerId) self.receiveMessage(context.data.payload);
 		})
 
 
@@ -149,11 +321,7 @@ var WRTC = (function WRTC() {
 				videoChatLimit: clientVars.webrtc.videoChatLimit,
 				headerId: ''
 			});
-			var $wrtc_modal = $(`<div id="wrtc_modal"><div class="videoWrapper" class="thin-scrollbar">
-			<div class="videos">
-					<video id="localVideo" autoplay muted playsinline ></video>
-			</div>
-			</div></div`);
+			var $wrtc_modal = $('<div id="wrtc_modal"><div class="videoWrapper" class="thin-scrollbar"></div></div');
 			$wrtc_modal.append(werc_toolbar);
 			$('body').prepend($wrtc_modal);
 
@@ -320,9 +488,24 @@ var WRTC = (function WRTC() {
 		},
 		activate: function activate(headerId) {
 			self.show();
-			isActive = true;
-			// startLocalStream();
-			return self.getUserMedia(headerId);
+			// isActive = true;
+			// return self.getUserMedia(headerId);
+
+
+ 
+			if(!connection) initRTConnection()
+			console.log("open new room")
+
+			connection.openOrJoin(headerId, function(isRoomCreated, roomid, error) {
+				if (connection.isInitiator === true) {
+						connection.open(headerId)
+				} else {
+					connection.join(headerId)
+				}
+		});
+        
+
+
 		},
 		deactivate: function deactivate(userId, headerId) {
 			// if (!userId) return false;
@@ -335,14 +518,96 @@ var WRTC = (function WRTC() {
 			// 	share.stopStreaming(localStream)
 			// 	localStream = null;
 			// }
-			// socket.close()
-			if(localStream) share.stopStreaming(localStream)
-			// const headerId = window.headerId
-			// const padId = clientVars.padId
-			// const userId = clientVars.userId
-			socket.emit('user-leaving', padId, headerId, userId, () =>{
-				console.log("socket user leaving")
-			})
+
+			console.log(connection.getAllParticipants())
+			connection.getAllParticipants().forEach(function(pid) {
+
+					console.log(pid, "====================")
+					connection.disconnectWith(pid);
+			});
+
+
+
+
+			 // stop all local cameras
+			 connection.attachStreams.forEach(function(localStream) {
+				 console.log(localStream)
+				 if(localStream.type === 'local')	localStream.stop();
+					
+				});
+
+
+
+			 // close socket.io connection
+			 connection.closeSocket();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 		},
 		toggleMuted: function toggleMuted() {
@@ -374,7 +639,7 @@ var WRTC = (function WRTC() {
 					'max-height': videoSizes.small
 				})
 				.append($('<div class="user-name">').text(user.name))
-				.append(`<p class="connectionStatus" style="color: #ffff;position: absolute;padding: 0;margin:0">connecting</p>`)
+				.append(`<p class="connectionStatus" style="color: #ffff;position: absolute;padding: 0;">connecting</p>`)
 				.appendTo($('#wrtc_modal .videoWrapper'));
 
 				video = $('<video playsinline>')
@@ -418,6 +683,7 @@ var WRTC = (function WRTC() {
 			if(!video){
 				self.appendNewVideoInterface(userId, stream)
 			} else {
+				
 				if(stream) attachMediaStream(video, stream);
 			}
 			
@@ -467,15 +733,14 @@ var WRTC = (function WRTC() {
 					$largeVideo.attr('title', videoEnlarged ? 'Make video smaller' : 'Make video larger').toggleClass('large', videoEnlarged);
 
 					var videoSize = $(document).find('#wrtc_modal .ndbtn.btn_enlarge').hasClass('large') ? videoSizes.large : videoSizes.small;
-					
 					$video.parent().css({ width: videoSize, 'max-height': videoSize });
 					$video.css({ width: videoSize, 'max-height': videoSize });
 				}
 			});
 
 			if($(document).find('#wrtc_modal .ndbtn.btn_enlarge').hasClass('large')){
-				$video.parent().css({ width: videoSizes.large,  });
-				$video.css({ width: videoSizes.large, });
+				$video.parent().css({ width: videoSizes.large, 'max-height': videoSizes.large });
+				$video.css({ width: videoSizes.large, 'max-height': videoSizes.large });
 			}
 
 			if(isLocal) localVideoElement = $video;
@@ -514,21 +779,18 @@ var WRTC = (function WRTC() {
 			var type = data.type;
 			// ignore own messages
 			if (peer === share.getUserId()) return;
-			// console.log(peer, "===-===",share.getUserId(), "===", type, new Date().getSeconds())
+			console.log(peer, "===-===",share.getUserId(), "===", type, new Date().getSeconds())
 			
-
 			if (type === 'hangup') {
 				self.hangup(peer, true);
 			} else if (type === 'offer') {
 
-				
 				if (pc[peer]) {
-					// self.hangup(peer, true);
+					self.hangup(peer, true);
 					self.createPeerConnection(peer, data.headerId);
 				} else {
 					self.createPeerConnection(peer, data.headerId);
 				}
-
 
 				if (localStream) {
 					if (pc[peer].getLocalStreams) {
@@ -544,56 +806,51 @@ var WRTC = (function WRTC() {
 
 				var offer = new RTCSessionDescription(data.offer);
 
-				await pc[peer].setRemoteDescription(offer).catch(err => logError(err, "offer:setRemoteDescription"))
-				
+				pc[peer].setRemoteDescription(offer)
 
+				.then(function(){
+					pc[peer].createAnswer(sdpConstraints)
+					.then(function(desc){
+						desc.sdp = cleanupSdp(desc.sdp);
+						pc[peer].setLocalDescription(desc)
+						.then(function(){
+							self.sendMessage(peer, { type: 'answer', answer: desc, userId: msg.from, headerId: data.headerId });
+						}).catch((err) => logError(err, "offer:setLocalDescription"))
+					}).catch((err) => logError(err, "offer:createAnswer"))
+				}).catch((err) => logError(err, "offer:setRemoteDescription"))
 
-				localStream.name = "==offer==offer=="+"====="+peer+"======"+"==="+clientVars.userId
-
-				// pc[peer].addStream(localStream);
-
-
-				
-				let desc = await pc[peer].createAnswer(sdpConstraints).catch((err) => logError(err, "offer:createAnswer"))
-				
-				// console.log(desc,"==333333333333333333333333333333")
-				desc.sdp = cleanupSdp(desc.sdp);
-
-				await pc[peer].setLocalDescription(desc).catch((err) => logError(err, "offer:setLocalDescription"))
-
-				self.sendMessage(peer, { type: 'answer', answer: desc, userId: msg.from, headerId: data.headerId });
-				// console.log("Now You can have new connection33333")
 			} else if (type === 'answer') {
-				//  console.log(type, "============", peer)
 				if (pc[peer]) {
-					// console.log(data, "================")
 					var answer = new RTCSessionDescription(data.answer);
-					await pc[peer].setRemoteDescription(answer).catch((err) => logError(err, "answer:setRemoteDescription", msg))
-					// console.log("Now You can have new connection22222222")
+					pc[peer].setRemoteDescription(answer)
+					.then(function () {
+						console.log("doooooooooooooononononononononononononoon111", new Date().getSeconds())
+					})
+					.catch((err) => logError(err, "answer:setRemoteDescription", msg))
 				}
 			} else if (type === 'icecandidate') {
-
-				
-				if(msg.data.userId == clientVars.userId) console.log(msg, "=====")
-				if(msg.data.userId !== clientVars.userId) return false
-
 				if (pc[peer]) {
 					if(!data.candidate) return false
 					var candidate = new RTCIceCandidate(data.candidate);
-					// console.log(candidate)
-					await pc[peer].addIceCandidate(candidate).catch(error => {
-						console.error('Error: Failure during addIceCandidate()', error);
-					})
-					// console.log("Now You can have new connection11")
+					if(!candidate ||!pc[peer].addIceCandidate) return false
+					var p = pc[peer].addIceCandidate(candidate);
+					if (p) {
+						p.then(function () {
+							// Do stuff when the candidate is successfully passed to the ICE agent
+						console.log("doooooooooooooononononononononononononoon22222", new Date().getSeconds())
+
+						}).catch(function () {
+							console.error('Error: Failure during addIceCandidate()');
+							// self.receiveMessage(msg)
+						});
+					}
 				}
 			} else {
 				console.error('unknown server message', data);
 			}
 
-			return true;
 		},
 		audioVideoInputChange: function audioVideoInputChange() {
-			if(!localStream) return false;
 			localStream.getTracks().forEach(function (track) {
 				track.stop();
 			});
@@ -630,7 +887,7 @@ var WRTC = (function WRTC() {
 		},
 		hangup: function hangup(userId, notify, headerId) {
 			notify = arguments.length === 1 ? true : notify;
-			// console.log("hangUp", userId, notify, headerId)
+			console.log("hangUp", userId, notify, headerId)
 			if (pc[userId] && userId !== share.getUserId()) {
 				self.removeVideoInterface(userId)
 				pc[userId].close();
@@ -638,7 +895,7 @@ var WRTC = (function WRTC() {
 				if (notify) self.sendMessage(userId, { type: 'hangup', headerId: headerId });
 			}
 		},
-		createPeerConnection: function createPeerConnection(userId, headerId, targetCreate) {
+		createPeerConnection: function createPeerConnection(userId, headerId) {
 			if (pc[userId]) console.warn('WARNING creating PC connection even though one exists', userId);
 			// if((pc[userId])) return false
 
@@ -647,21 +904,8 @@ var WRTC = (function WRTC() {
 			pc[userId].onicecandidate = function (event) {
 				if (event.candidate) {
 					self.appendNewVideoInterface(userId)
-					self.sendMessage(userId, {type: 'icecandidate', userId:userId, headerId: headerId, candidate: event.candidate});
-				} else {
-					// socket.emit('openForCalling', window.pad.getPadId(), window.headerId)
-					// console.log("now you can have newconnnection44444444444444444444")
-			
+					self.sendMessage(userId, {type: 'icecandidate', headerId: headerId, candidate: event.candidate});
 				}
-			};
-
-			if(targetCreate === 'local'){
-				
-			}
-
-			pc[userId].ontrack = function(event) {
-				remoteStream[userId] = event.stream;
-				self.setStream(userId, event.stream);
 			};
 
 			pc[userId].onaddstream = function (event) {
@@ -683,30 +927,21 @@ var WRTC = (function WRTC() {
 			// https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/createOffer#RTCOfferOptions_dictionary
 			constraints = mergeConstraints(constraints, sdpConstraints);
 
-			if (!pc[userId]) self.createPeerConnection(userId, headerId, 'local');
+			if (!pc[userId]) self.createPeerConnection(userId, headerId);
 			
 			pc[userId].addStream(localStream);
 
-			pc[userId].addEventListener("negotiationneeded", ev => {
-
-				pc[userId].createOffer(constraints)
-				.then(function(desc) {
-					desc.sdp = cleanupSdp(desc.sdp);
-					return pc[userId].setLocalDescription(desc)
-				})
-				.then(function (){
-				// if (userId !== share.getUserId() ) {
-					
-					// }
-					self.sendMessage(userId, { type: 'offer', offer: pc[userId].localDescription, headerId: headerId });			
-				}).then(function(){
-					
-				})
-				.catch((err) => logError(err, "call:createOffer"));
-
+			pc[userId].createOffer(constraints)
+			.then(function(desc) {
+				desc.sdp = cleanupSdp(desc.sdp);
+				return pc[userId].setLocalDescription(desc)
 			})
-
-
+			.then(function (){
+				self.sendMessage(userId, { type: 'offer', offer: pc[userId].localDescription, headerId: headerId });			
+			}).then(function(){
+				
+			})
+			.catch((err) => logError(err, "call:createOffer"));
 		},
 		getUserMedia: function getUserMedia(headerId) {
 			audioInputSelect = document.querySelector('select#audioSource');
@@ -741,16 +976,37 @@ var WRTC = (function WRTC() {
 			// save user default video/audio settings
 			localStorage.setItem('videoSettings', JSON.stringify({ microphone: audioSource, speaker: audioOutput, camera: videoSource }));
 
+			window.navigator.mediaDevices
+			.getUserMedia(mediaConstraints)
+			.then(function (stream) {
+				localStream = stream;
+				// create video stream for current pc
+				self.appendNewVideoInterface(share.getUserId(), stream)
 
-			WRTC_CORE.startLocalStream(window.headerId)
+				socket.emit('getHeaderUserlist', padId, headerId, function(userList){
+					userList.forEach(function (userId) {
+						if (userId !== share.getUserId() ) {
+							if (pc[userId] && gState === "RECONNECTING") {
+								self.hangup(userId, null, headerId);
+							}
+							// make a call, and get streem connection for the other user are in room
 
+							// socket.emit("makeCall", padId, userId, headerId)
+
+							self.call(userId, headerId);
+						}
+					});
+				})
+			})
+			.catch(function (err) {
+				self.showUserMediaError(err);
+			});
 		}
 	};
 
 	// Normalize RTC implementation between browsers
 	// var getUserMedia = window.navigator.mediaDevices.getUserMedia
 	var attachMediaStream = function attachMediaStream(element, stream) {
-		console.log(stream)
 		if (!stream){
 			console.error("[wrtc]: stream is not exists.", stream)
 			return false;
@@ -800,58 +1056,21 @@ var WRTC = (function WRTC() {
 
 	function logError(error, functionName, data) {
 		// attempt to reconnect
-		console.log(error, functionName, data, "=========logError")
+		console.log(error, functionName, data)
 		if(error && error.message.includes("Failed to set remote answer sdp")){
 			console.log("Try reconnecting")
-			//setTimeout(() => {
+			setTimeout(() => {
 				console.log("reconnecting...")
 				// self.receiveMessage(data)
 				gState = "RECONNECTING"
-				// share.stopStreaming(localStream)
-				// self.getUserMedia(window.headerId)
-
-
-				socket.emit('getHeaderUserlist', window.pad.getPadId(), window.headerId, function(userList){
-					userList.forEach(function (userId) {
-						if (userId !== share.getUserId() ) {
-							// if (pc[userId]) {
-							// 	self.hangup(userId, null, headerId);
-							// }
-							self.call(userId, window.headerId);
-						}
-					});
-				});
-
-
+				self.getUserMedia(window.headerId)
 
 				// $(document).find("#wrtc_modal .btn_reload.btn_roomHandler").trigger("click")
-			//}, 100);
+			}, 5000);
 		}
 		
 		console.error('WebRTC ERROR:', error);
 	}
-
-
-
-
-
-
-
-
-
-
-
-	
-
-
-
-
-
-
-
-
-
-
 
 	self.pc = pc;
 	return self;
@@ -862,252 +1081,3 @@ var WRTC = (function WRTC() {
 // Get Start
 // action flow
 // 1. activate
-
-
-
-var WRTC_CORE = (function () {
-	var loc = document.location;
-	var port = loc.port === "" ? (loc.protocol === "https:" ? 443 : 80) : loc.port;
-	var url = loc.protocol + "//" + loc.hostname + ":" + port;
-	const socket = io.connect(url, { secure: true });
-
-	const mediaStreamConstraints = {
-		video: true,
-	};
-
-	const offerOptions = {
-		offerToReceiveVideo: 1,
-	};
-	const localVideo = $(document).find("#localVideo")[0];
-	let localStream;
-	let localUserId;
-	let connections = [];
-	let headerId;
-
-	function gotRemoteStream(event, userId) {
-		let remoteVideo = document.createElement("video");
-
-		remoteVideo.setAttribute("data-socket", userId);
-		remoteVideo.srcObject = event.stream;
-		remoteVideo.autoplay = true;
-		remoteVideo.muted = true;
-		remoteVideo.playsinline = true;
-		remoteVideo.style.width = "150px";
-		$(document).find(".videos").append(remoteVideo);
-	}
-
-	function gotIceCandidate(fromId, candidate) {
-		connections[fromId]
-			.addIceCandidate(new RTCIceCandidate(candidate))
-			.catch(handleError);
-	}
-
-	function startLocalStream(comingheader) {
-		headerId = comingheader
-		navigator.mediaDevices
-			.getUserMedia(mediaStreamConstraints)
-			.then(getUserMediaSuccess)
-			.then(connectSocketToSignaling)
-			.then(() => {})
-			.catch(handleError);
-	}
-
-	function globVideoLeavingRoom() {
-		const headerId = window.headerId;
-		const padId = clientVars.padId;
-		const userId = clientVars.userId;
-		socket.emit("user-leaving", padId, headerId, userId, () => {
-			console.log("socket user leaving");
-		});
-	}
-
-	function connectSocketToSignaling() {
-		// socket.on("connect", () => {
-			localUserId = socket.id;
-			console.log("localUser", localUserId);
-
-			const headerId = window.headerId;
-			const padId = clientVars.padId;
-			const userId = clientVars.userId;
-
-			socket.emit("user-joining", padId, headerId, userId, () => {
-				console.log("user sendddd");
-			});
-
-			socket.on("user-joined", (data) => {
-				const clients = data.clients;
-				const joinedUserId = data.joinedUserId;
-				console.log(joinedUserId, " joined");
-				if (Array.isArray(clients) && clients.length > 0) {
-					clients.forEach((userId) => {
-						if (!connections[userId]) {
-							connections[userId] = new RTCPeerConnection(
-								mediaStreamConstraints
-							);
-							connections[userId].onicecandidate = () => {
-								if (event.candidate) {
-									console.log(socket.id, " Send candidate to ", userId);
-									socket.emit("signaling", {
-										headerId: headerId,
-										type: "candidate",
-										candidate: event.candidate,
-										toId: userId,
-									});
-								}
-							};
-							connections[userId].onaddstream = () => {
-								gotRemoteStream(event, userId);
-							};
-							connections[userId].addStream(localStream);
-						}
-					});
-
-					if (data.count >= 2) {
-						connections[joinedUserId]
-							.createOffer(offerOptions)
-							.then((description) => {
-								connections[joinedUserId]
-									.setLocalDescription(description)
-									.then(() => {
-										console.log(socket.id, " Send offer to ", joinedUserId);
-										socket.emit("signaling", {
-											headerId: headerId,
-											toId: joinedUserId,
-											description: connections[joinedUserId].localDescription,
-											type: "sdp",
-										});
-									})
-									.catch(handleError);
-							});
-					}
-				}
-			});
-
-			socket.on("user-left", (userId) => {
-				console.log("user left", userId)
-				// let video = document.querySelector('[data-socket="'+ userId +'"]');
-				$(document)
-					.find('[data-socket="' + userId + '"]')
-					.remove();
-				if (localStream) share.stopStreaming(localStream);
-				connections[userId] = null
-				delete connections[userId]
-				// video.parentNode.removeChild(video);
-			});
-
-			socket.on("signaling", (data) => {
-				console.log(data, data.headerId === window.headerId)
-				if(data.headerId === window.headerId){
-					gotMessageFromSignaling(socket, data);
-				}
-			});
-		// });
-	}
-
-	function gotMessageFromSignaling(socket, data) {
-		const fromId = data.fromId;
-		if (fromId !== localUserId) {
-			switch (data.type) {
-				case "candidate":
-					console.log(socket.id, " Receive Candidate from ", fromId);
-					if (data.candidate) {
-						gotIceCandidate(fromId, data.candidate);
-					}
-					break;
-
-				case "sdp":
-					if (data.description) {
-						console.log(socket.id, " Receive sdp from ", fromId);
-						connections[fromId]
-							.setRemoteDescription(new RTCSessionDescription(data.description))
-							.then(() => {
-								if (data.description.type === "offer") {
-									connections[fromId]
-										.createAnswer()
-										.then((description) => {
-											connections[fromId]
-												.setLocalDescription(description)
-												.then(() => {
-													console.log(socket.id, " Send answer to ", fromId);
-													socket.emit("signaling", {
-														type: "sdp",
-														headerId: headerId,
-														toId: fromId,
-														description: connections[fromId].localDescription,
-													});
-												});
-										})
-										.catch(handleError);
-								}
-							})
-							.catch(handleError);
-					}
-					break;
-			}
-		}
-	}
-
-	function getUserMediaSuccess(mediaStream) {
-		const localVideo = $(document)
-			.find("#localVideo")
-			.css({ width: "150px" })[0];
-		localStream = mediaStream;
-		console.log(localVideo);
-		localVideo.srcObject = mediaStream;
-	}
-
-	function handleError(error) {
-		// console.log(e);
-		// alert("Something went wrong");
-
-		// attempt to reconnect
-		// console.log(error, functionName, data, "=========logError")
-		if (error && error.message.includes("Failed to set remote answer sdp")) {
-			console.log("Try reconnecting");
-			//setTimeout(() => {
-			console.log("reconnecting...");
-			// self.receiveMessage(data)
-			gState = "RECONNECTING";
-			// share.stopStreaming(localStream)
-			// self.getUserMedia(window.headerId)
-
-			// socket.emit('getHeaderUserlist', window.pad.getPadId(), window.headerId, function(userList){
-			// 	userList.forEach(function (userId) {
-			// 		if (userId !== share.getUserId() ) {
-			// 			// if (pc[userId]) {
-			// 			// 	self.hangup(userId, null, headerId);
-			// 			// }
-			// 			self.call(userId, window.headerId);
-			// 		}
-			// 	});
-			// });
-
-			connectSocketToSignaling();
-
-			// $(document).find("#wrtc_modal .btn_reload.btn_roomHandler").trigger("click")
-			//}, 100);
-		}
-
-		console.error("WebRTC ERROR:", error);
-	}
-
-	return {
-		startLocalStream
-	};
-})();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

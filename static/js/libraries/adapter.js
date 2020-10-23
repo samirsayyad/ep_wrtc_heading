@@ -123,9 +123,6 @@
 				firefoxShim.shimSenderGetStats(window);
 				firefoxShim.shimReceiverGetStats(window);
 				firefoxShim.shimRTCDataChannel(window);
-				firefoxShim.shimAddTransceiver(window);
-				firefoxShim.shimCreateOffer(window);
-				firefoxShim.shimCreateAnswer(window);
 	
 				commonShim.shimRTCIceCandidate(window);
 				commonShim.shimConnectionState(window);
@@ -1842,9 +1839,6 @@
 	exports.shimReceiverGetStats = shimReceiverGetStats;
 	exports.shimRemoveStream = shimRemoveStream;
 	exports.shimRTCDataChannel = shimRTCDataChannel;
-	exports.shimAddTransceiver = shimAddTransceiver;
-	exports.shimCreateOffer = shimCreateOffer;
-	exports.shimCreateAnswer = shimCreateAnswer;
 	
 	var _utils = require('../utils');
 	
@@ -1888,24 +1882,21 @@
 		}
 	
 		// support for addIceCandidate(null or undefined)
-		// as well as ignoring {sdpMid, candidate: ""}
-		if (browserDetails.version < 68) {
-			var nativeAddIceCandidate = window.RTCPeerConnection.prototype.addIceCandidate;
-			window.RTCPeerConnection.prototype.addIceCandidate = function addIceCandidate() {
-				if (!arguments[0]) {
-					if (arguments[1]) {
-						arguments[1].apply(null);
-					}
-					return Promise.resolve();
+		var nativeAddIceCandidate = window.RTCPeerConnection.prototype.addIceCandidate;
+		window.RTCPeerConnection.prototype.addIceCandidate = function addIceCandidate() {
+			if (!arguments[0]) {
+				if (arguments[1]) {
+					arguments[1].apply(null);
 				}
-				// Firefox 68+ emits and processes {candidate: "", ...}, ignore
-				// in older versions.
-				if (arguments[0] && arguments[0].candidate === '') {
-					return Promise.resolve();
-				}
-				return nativeAddIceCandidate.apply(this, arguments);
-			};
-		}
+				return Promise.resolve();
+			}
+			// Firefox 68+ emits and processes {candidate: "", ...}, ignore
+			// in older versions.
+			if (browserDetails.version < 68 && arguments[0] && arguments[0].candidate === '') {
+				return Promise.resolve();
+			}
+			return nativeAddIceCandidate.apply(this, arguments);
+		};
 	
 		var modernStatsTypes = {
 			inboundrtp: 'inbound-rtp',
@@ -2030,108 +2021,6 @@
 		if (window.DataChannel && !window.RTCDataChannel) {
 			window.RTCDataChannel = window.DataChannel;
 		}
-	}
-	
-	function shimAddTransceiver(window) {
-		// https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
-		// Firefox ignores the init sendEncodings options passed to addTransceiver
-		// https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
-		if (!((typeof window === 'undefined' ? 'undefined' : _typeof(window)) === 'object' && window.RTCPeerConnection)) {
-			return;
-		}
-		var origAddTransceiver = window.RTCPeerConnection.prototype.addTransceiver;
-		if (origAddTransceiver) {
-			window.RTCPeerConnection.prototype.addTransceiver = function addTransceiver() {
-				this.setParametersPromises = [];
-				var initParameters = arguments[1];
-				var shouldPerformCheck = initParameters && 'sendEncodings' in initParameters;
-				if (shouldPerformCheck) {
-					// If sendEncodings params are provided, validate grammar
-					initParameters.sendEncodings.forEach(function (encodingParam) {
-						if ('rid' in encodingParam) {
-							var ridRegex = /^[a-z0-9]{0,16}$/i;
-							if (!ridRegex.test(encodingParam.rid)) {
-								throw new TypeError('Invalid RID value provided.');
-							}
-						}
-						if ('scaleResolutionDownBy' in encodingParam) {
-							if (!(parseFloat(encodingParam.scaleResolutionDownBy) >= 1.0)) {
-								throw new RangeError('scale_resolution_down_by must be >= 1.0');
-							}
-						}
-						if ('maxFramerate' in encodingParam) {
-							if (!(parseFloat(encodingParam.maxFramerate) >= 0)) {
-								throw new RangeError('max_framerate must be >= 0.0');
-							}
-						}
-					});
-				}
-				var transceiver = origAddTransceiver.apply(this, arguments);
-				if (shouldPerformCheck) {
-					// Check if the init options were applied. If not we do this in an
-					// asynchronous way and save the promise reference in a global object.
-					// This is an ugly hack, but at the same time is way more robust than
-					// checking the sender parameters before and after the createOffer
-					// Also note that after the createoffer we are not 100% sure that
-					// the params were asynchronously applied so we might miss the
-					// opportunity to recreate offer.
-					var sender = transceiver.sender;
-	
-					var params = sender.getParameters();
-					if (!('encodings' in params)) {
-						params.encodings = initParameters.sendEncodings;
-						this.setParametersPromises.push(sender.setParameters(params).catch(function () {}));
-					}
-				}
-				return transceiver;
-			};
-		}
-	}
-	
-	function shimCreateOffer(window) {
-		// https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
-		// Firefox ignores the init sendEncodings options passed to addTransceiver
-		// https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
-		if (!((typeof window === 'undefined' ? 'undefined' : _typeof(window)) === 'object' && window.RTCPeerConnection)) {
-			return;
-		}
-		var origCreateOffer = window.RTCPeerConnection.prototype.createOffer;
-		window.RTCPeerConnection.prototype.createOffer = function createOffer() {
-			var _this4 = this,
-					_arguments2 = arguments;
-	
-			if (this.setParametersPromises && this.setParametersPromises.length) {
-				return Promise.all(this.setParametersPromises).then(function () {
-					return origCreateOffer.apply(_this4, _arguments2);
-				}).finally(function () {
-					_this4.setParametersPromises = [];
-				});
-			}
-			return origCreateOffer.apply(this, arguments);
-		};
-	}
-	
-	function shimCreateAnswer(window) {
-		// https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
-		// Firefox ignores the init sendEncodings options passed to addTransceiver
-		// https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
-		if (!((typeof window === 'undefined' ? 'undefined' : _typeof(window)) === 'object' && window.RTCPeerConnection)) {
-			return;
-		}
-		var origCreateAnswer = window.RTCPeerConnection.prototype.createAnswer;
-		window.RTCPeerConnection.prototype.createAnswer = function createAnswer() {
-			var _this5 = this,
-					_arguments3 = arguments;
-	
-			if (this.setParametersPromises && this.setParametersPromises.length) {
-				return Promise.all(this.setParametersPromises).then(function () {
-					return origCreateAnswer.apply(_this5, _arguments3);
-				}).finally(function () {
-					_this5.setParametersPromises = [];
-				});
-			}
-			return origCreateAnswer.apply(this, arguments);
-		};
 	}
 	
 	},{"../utils":15,"./getdisplaymedia":12,"./getusermedia":13}],12:[function(require,module,exports){
@@ -3073,7 +2962,7 @@
 	
 	function maybeAddCandidate(iceTransport, candidate) {
 		// Edge's internal representation adds some fields therefore
-		// not all fieldÑ• are taken into account.
+		// not all fieldѕ are taken into account.
 		var alreadyAdded = iceTransport.getRemoteCandidates()
 				.find(function(remoteCandidate) {
 					return candidate.foundation === remoteCandidate.foundation &&
@@ -3475,7 +3364,7 @@
 			iceGatherer.onlocalcandidate = function(evt) {
 				if (pc.usingBundle && sdpMLineIndex > 0) {
 					// if we know that we use bundle we can drop candidates with
-					// Ñ•dpMLineIndex > 0. If we don't do this then our state gets
+					// ѕdpMLineIndex > 0. If we don't do this then our state gets
 					// confused since we dispose the extra ice gatherer.
 					return;
 				}
@@ -3483,7 +3372,7 @@
 				event.candidate = {sdpMid: mid, sdpMLineIndex: sdpMLineIndex};
 	
 				var cand = evt.candidate;
-				// Edge emits an empty object for RTCIceCandidateCompleteâ€¥
+				// Edge emits an empty object for RTCIceCandidateComplete‥
 				var end = !cand || Object.keys(cand).length === 0;
 				if (end) {
 					// polyfill since RTCIceGatherer.state is not implemented in
@@ -4721,7 +4610,7 @@
 	};
 	
 	},{"sdp":17}],17:[function(require,module,exports){
-	/* eslint-env node */
+	 /* eslint-env node */
 	'use strict';
 	
 	// SDP helpers.
@@ -4901,8 +4790,8 @@
 	SDPUtils.writeExtmap = function(headerExtension) {
 		return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
 				(headerExtension.direction && headerExtension.direction !== 'sendrecv'
-					? '/' + headerExtension.direction
-					: '') +
+						? '/' + headerExtension.direction
+						: '') +
 				' ' + headerExtension.uri + '\r\n';
 	};
 	
@@ -5017,7 +4906,7 @@
 	//   get the fingerprint line as input. See also getIceParameters.
 	SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
 		var lines = SDPUtils.matchPrefix(mediaSection + sessionpart,
-			'a=fingerprint:');
+				'a=fingerprint:');
 		// Note: a=setup line is ignored since we use the 'auto' role.
 		// Note2: 'algorithm' is not case sensitive except in Edge.
 		return {
@@ -5071,15 +4960,15 @@
 		for (var i = 3; i < mline.length; i++) { // find all codecs from mline[3..]
 			var pt = mline[i];
 			var rtpmapline = SDPUtils.matchPrefix(
-				mediaSection, 'a=rtpmap:' + pt + ' ')[0];
+					mediaSection, 'a=rtpmap:' + pt + ' ')[0];
 			if (rtpmapline) {
 				var codec = SDPUtils.parseRtpMap(rtpmapline);
 				var fmtps = SDPUtils.matchPrefix(
-					mediaSection, 'a=fmtp:' + pt + ' ');
+						mediaSection, 'a=fmtp:' + pt + ' ');
 				// Only the first a=fmtp:<pt> is considered.
 				codec.parameters = fmtps.length ? SDPUtils.parseFmtp(fmtps[0]) : {};
 				codec.rtcpFeedback = SDPUtils.matchPrefix(
-					mediaSection, 'a=rtcp-fb:' + pt + ' ')
+						mediaSection, 'a=rtcp-fb:' + pt + ' ')
 					.map(SDPUtils.parseRtcpFb);
 				description.codecs.push(codec);
 				// parse FEC mechanisms from rtpmap lines.
@@ -5155,22 +5044,22 @@
 	
 		// filter a=ssrc:... cname:, ignore PlanB-msid
 		var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-			.map(function(line) {
-				return SDPUtils.parseSsrcMedia(line);
-			})
-			.filter(function(parts) {
-				return parts.attribute === 'cname';
-			});
+		.map(function(line) {
+			return SDPUtils.parseSsrcMedia(line);
+		})
+		.filter(function(parts) {
+			return parts.attribute === 'cname';
+		});
 		var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
 		var secondarySsrc;
 	
 		var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
-			.map(function(line) {
-				var parts = line.substr(17).split(' ');
-				return parts.map(function(part) {
-					return parseInt(part, 10);
-				});
+		.map(function(line) {
+			var parts = line.substr(17).split(' ');
+			return parts.map(function(part) {
+				return parseInt(part, 10);
 			});
+		});
 		if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
 			secondarySsrc = flows[0][1];
 		}
@@ -5227,12 +5116,12 @@
 		// Gets the first SSRC. Note tha with RTX there might be multiple
 		// SSRCs.
 		var remoteSsrc = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-			.map(function(line) {
-				return SDPUtils.parseSsrcMedia(line);
-			})
-			.filter(function(obj) {
-				return obj.attribute === 'cname';
-			})[0];
+				.map(function(line) {
+					return SDPUtils.parseSsrcMedia(line);
+				})
+				.filter(function(obj) {
+					return obj.attribute === 'cname';
+				})[0];
 		if (remoteSsrc) {
 			rtcpParameters.cname = remoteSsrc.value;
 			rtcpParameters.ssrc = remoteSsrc.ssrc;
@@ -5244,7 +5133,7 @@
 		rtcpParameters.reducedSize = rsize.length > 0;
 		rtcpParameters.compound = rsize.length === 0;
 	
-		// parses the rtcp-mux attrÑ–bute.
+		// parses the rtcp-mux attrіbute.
 		// Note that Edge does not support unmuxed RTCP.
 		var mux = SDPUtils.matchPrefix(mediaSection, 'a=rtcp-mux');
 		rtcpParameters.mux = mux.length > 0;
@@ -5262,76 +5151,16 @@
 			return {stream: parts[0], track: parts[1]};
 		}
 		var planB = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-			.map(function(line) {
-				return SDPUtils.parseSsrcMedia(line);
-			})
-			.filter(function(msidParts) {
-				return msidParts.attribute === 'msid';
-			});
+		.map(function(line) {
+			return SDPUtils.parseSsrcMedia(line);
+		})
+		.filter(function(msidParts) {
+			return msidParts.attribute === 'msid';
+		});
 		if (planB.length > 0) {
 			parts = planB[0].value.split(' ');
 			return {stream: parts[0], track: parts[1]};
 		}
-	};
-	
-	// SCTP
-	// parses draft-ietf-mmusic-sctp-sdp-26 first and falls back
-	// to draft-ietf-mmusic-sctp-sdp-05
-	SDPUtils.parseSctpDescription = function(mediaSection) {
-		var mline = SDPUtils.parseMLine(mediaSection);
-		var maxSizeLine = SDPUtils.matchPrefix(mediaSection, 'a=max-message-size:');
-		var maxMessageSize;
-		if (maxSizeLine.length > 0) {
-			maxMessageSize = parseInt(maxSizeLine[0].substr(19), 10);
-		}
-		if (isNaN(maxMessageSize)) {
-			maxMessageSize = 65536;
-		}
-		var sctpPort = SDPUtils.matchPrefix(mediaSection, 'a=sctp-port:');
-		if (sctpPort.length > 0) {
-			return {
-				port: parseInt(sctpPort[0].substr(12), 10),
-				protocol: mline.fmt,
-				maxMessageSize: maxMessageSize
-			};
-		}
-		var sctpMapLines = SDPUtils.matchPrefix(mediaSection, 'a=sctpmap:');
-		if (sctpMapLines.length > 0) {
-			var parts = SDPUtils.matchPrefix(mediaSection, 'a=sctpmap:')[0]
-				.substr(10)
-				.split(' ');
-			return {
-				port: parseInt(parts[0], 10),
-				protocol: parts[1],
-				maxMessageSize: maxMessageSize
-			};
-		}
-	};
-	
-	// SCTP
-	// outputs the draft-ietf-mmusic-sctp-sdp-26 version that all browsers
-	// support by now receiving in this format, unless we originally parsed
-	// as the draft-ietf-mmusic-sctp-sdp-05 format (indicated by the m-line
-	// protocol of DTLS/SCTP -- without UDP/ or TCP/)
-	SDPUtils.writeSctpDescription = function(media, sctp) {
-		var output = [];
-		if (media.protocol !== 'DTLS/SCTP') {
-			output = [
-				'm=' + media.kind + ' 9 ' + media.protocol + ' ' + sctp.protocol + '\r\n',
-				'c=IN IP4 0.0.0.0\r\n',
-				'a=sctp-port:' + sctp.port + '\r\n'
-			];
-		} else {
-			output = [
-				'm=' + media.kind + ' 9 ' + media.protocol + ' ' + sctp.port + '\r\n',
-				'c=IN IP4 0.0.0.0\r\n',
-				'a=sctpmap:' + sctp.port + ' ' + sctp.protocol + ' 65535\r\n'
-			];
-		}
-		if (sctp.maxMessageSize !== undefined) {
-			output.push('a=max-message-size:' + sctp.maxMessageSize + '\r\n');
-		}
-		return output.join('');
 	};
 	
 	// Generate a session ID for SDP.
@@ -5369,12 +5198,12 @@
 	
 		// Map ICE parameters (ufrag, pwd) to SDP.
 		sdp += SDPUtils.writeIceParameters(
-			transceiver.iceGatherer.getLocalParameters());
+				transceiver.iceGatherer.getLocalParameters());
 	
 		// Map DTLS parameters to SDP.
 		sdp += SDPUtils.writeDtlsParameters(
-			transceiver.dtlsTransport.getLocalParameters(),
-			type === 'offer' ? 'actpass' : 'active');
+				transceiver.dtlsTransport.getLocalParameters(),
+				type === 'offer' ? 'actpass' : 'active');
 	
 		sdp += 'a=mid:' + transceiver.mid + '\r\n';
 	

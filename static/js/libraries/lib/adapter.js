@@ -645,9 +645,10 @@
 				var alreadyExists = _this9.getSenders().find(function (s) {
 					return s.track === track;
 				});
-				if (alreadyExists) {
-					throw new DOMException('Track already exists.', 'InvalidAccessError');
-				}
+				// if (alreadyExists) {
+				// 	console.log(stream.name, stream.name)
+				// 	throw new DOMException('Track already exists.', 'InvalidAccessError');
+				// }
 			});
 			var existingSenders = this.getSenders();
 			origAddStream.apply(this, arguments);
@@ -718,9 +719,9 @@
 				var alreadyExists = _this12.getSenders().find(function (s) {
 					return s.track === track;
 				});
-				if (alreadyExists) {
-					throw new DOMException('Track already exists.', 'InvalidAccessError');
-				}
+				// if (alreadyExists) {
+				// 	throw new DOMException('Track already exists.', 'InvalidAccessError');
+				// }
 			});
 			// Add identity mapping for consistency with addTrack.
 			// Unless this is being used with a stream from addTrack.

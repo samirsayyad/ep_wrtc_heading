@@ -742,7 +742,7 @@ var WRTC = (function WRTC() {
 			localStorage.setItem('videoSettings', JSON.stringify({ microphone: audioSource, speaker: audioOutput, camera: videoSource }));
 
 
-			WRTC_CORE.startLocalStream(window.headerId)
+			WRTC_CORE.startLocalStream()
 
 		}
 	};
@@ -882,7 +882,6 @@ var WRTC_CORE = (function () {
 	let localStream;
 	let localUserId;
 	let connections = [];
-	let headerId;
 
 	function gotRemoteStream(event, userId) {
 		let remoteVideo = document.createElement("video");
@@ -902,8 +901,7 @@ var WRTC_CORE = (function () {
 			.catch(handleError);
 	}
 
-	function startLocalStream(comingheader) {
-		headerId = comingheader
+	function startLocalStream() {
 		navigator.mediaDevices
 			.getUserMedia(mediaStreamConstraints)
 			.then(getUserMediaSuccess)
@@ -948,7 +946,6 @@ var WRTC_CORE = (function () {
 								if (event.candidate) {
 									console.log(socket.id, " Send candidate to ", userId);
 									socket.emit("signaling", {
-										headerId: headerId,
 										type: "candidate",
 										candidate: event.candidate,
 										toId: userId,
@@ -971,7 +968,6 @@ var WRTC_CORE = (function () {
 									.then(() => {
 										console.log(socket.id, " Send offer to ", joinedUserId);
 										socket.emit("signaling", {
-											headerId: headerId,
 											toId: joinedUserId,
 											description: connections[joinedUserId].localDescription,
 											type: "sdp",
@@ -984,22 +980,16 @@ var WRTC_CORE = (function () {
 			});
 
 			socket.on("user-left", (userId) => {
-				console.log("user left", userId)
 				// let video = document.querySelector('[data-socket="'+ userId +'"]');
 				$(document)
 					.find('[data-socket="' + userId + '"]')
 					.remove();
 				if (localStream) share.stopStreaming(localStream);
-				connections[userId] = null
-				delete connections[userId]
 				// video.parentNode.removeChild(video);
 			});
 
 			socket.on("signaling", (data) => {
-				console.log(data, data.headerId === window.headerId)
-				if(data.headerId === window.headerId){
-					gotMessageFromSignaling(socket, data);
-				}
+				gotMessageFromSignaling(socket, data);
 			});
 		// });
 	}
@@ -1031,7 +1021,6 @@ var WRTC_CORE = (function () {
 													console.log(socket.id, " Send answer to ", fromId);
 													socket.emit("signaling", {
 														type: "sdp",
-														headerId: headerId,
 														toId: fromId,
 														description: connections[fromId].localDescription,
 													});

@@ -141,11 +141,19 @@ const getUserInHeader = (padId, headerId) => {
 	return rooms[roomKey].map(x => x.userId);
 }
 
+const howsInheader = (padId, headerId) => {
+	const roomKey = `${padId}:${headerId}`;
+	if(!rooms[roomKey]) return [];
+
+	return rooms[roomKey].map(x => ({socketId: x.socketId, userId: x.userId}));
+}
+
 module.exports = {
 	socketUserJoin, 
 	socketBulkUpdateRooms,
 	socketUserLeave,
 	socketDisconnect,
-	getUserInHeader
+	getUserInHeader,
+	howsInheader
 
 }

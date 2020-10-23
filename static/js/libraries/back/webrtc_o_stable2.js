@@ -15,7 +15,6 @@
  */
 'use strict';
 
-
 var WRTC = (function WRTC() {
 	var padId = null;
 	var socket = null;
@@ -321,29 +320,20 @@ var WRTC = (function WRTC() {
 		activate: function activate(headerId) {
 			self.show();
 			isActive = true;
-			// startLocalStream();
-			return self.getUserMedia(headerId);
+			startLocalStream();
+			// return self.getUserMedia(headerId);
 		},
 		deactivate: function deactivate(userId, headerId) {
-			// if (!userId) return false;
-			// gState = "DEACTIVE"
-			// self.hide(userId);
-			// self.hangupAll(headerId);
-			// if(pc[userId]) pc[userId].close();
-			// self.hangup(userId, true, headerId);
-			// if (localStream) {
-			// 	share.stopStreaming(localStream)
-			// 	localStream = null;
-			// }
-			// socket.close()
-			if(localStream) share.stopStreaming(localStream)
-			// const headerId = window.headerId
-			// const padId = clientVars.padId
-			// const userId = clientVars.userId
-			socket.emit('user-leaving', padId, headerId, userId, () =>{
-				console.log("socket user leaving")
-			})
-
+			if (!userId) return false;
+			gState = "DEACTIVE"
+			self.hide(userId);
+			self.hangupAll(headerId);
+			if(pc[userId]) pc[userId].close();
+			self.hangup(userId, true, headerId);
+			if (localStream) {
+				share.stopStreaming(localStream)
+				localStream = null;
+			}
 		},
 		toggleMuted: function toggleMuted() {
 			var audioTrack = localStream.getAudioTracks()[0];
@@ -685,6 +675,7 @@ var WRTC = (function WRTC() {
 
 			if (!pc[userId]) self.createPeerConnection(userId, headerId, 'local');
 			
+			localStream.name = "==call==call=="+userId+"==="+clientVars.userId
 			pc[userId].addStream(localStream);
 
 			pc[userId].addEventListener("negotiationneeded", ev => {
@@ -741,9 +732,45 @@ var WRTC = (function WRTC() {
 			// save user default video/audio settings
 			localStorage.setItem('videoSettings', JSON.stringify({ microphone: audioSource, speaker: audioOutput, camera: videoSource }));
 
+			// window.navigator.mediaDevices.getUserMedia(mediaConstraints).then(function (stream) {
+			// 	localStream = stream;
+			// 	self.setStream(self._pad.getUserId(), stream);
+			// 	self._pad.collabClient.getConnectedUsers().forEach(function (user) {
+			// 		if (user.userId !== self.getUserId()) {
+			// 			if (pc[user.userId]) {
+			// 				self.hangup(user.userId, false, headerId);
+			// 			}
+			// 			self.call(user.userId, headerId);
+			// 		}
+			// 	});
+			// })['catch'](function (err) {
+			// 	self.showUserMediaError(err);
+			// });
 
-			WRTC_CORE.startLocalStream(window.headerId)
+			window.navigator.mediaDevices
+			.getUserMedia(mediaConstraints)
+			.then(function (stream) {
+				localStream = stream;
+				// create video stream for current pc
+				self.appendNewVideoInterface(share.getUserId(), stream)
 
+				socket.emit('canMakeACall', window.pad.getPadId(),  window.headerId, function(canI){
+						socket.emit('getHeaderUserlist', padId, window.headerId, function(userList){
+							userList.forEach(function (userId) {
+								if (userId !== share.getUserId() ) {
+									if (pc[userId]) {
+										self.hangup(userId, null, headerId);
+									}
+									self.call(userId, headerId);
+								}
+							});
+						})
+				})
+
+			})
+			.catch(function (err) {
+				self.showUserMediaError(err);
+			});
 		}
 	};
 
@@ -831,28 +858,6 @@ var WRTC = (function WRTC() {
 		console.error('WebRTC ERROR:', error);
 	}
 
-
-
-
-
-
-
-
-
-
-
-	
-
-
-
-
-
-
-
-
-
-
-
 	self.pc = pc;
 	return self;
 })();
@@ -864,91 +869,62 @@ var WRTC = (function WRTC() {
 // 1. activate
 
 
+const mediaStreamConstraints = {
+	video: true,
+};
+const offerOptions = {
+	offerToReceiveVideo: 1,
+};
+// const localVideo = $(document).find('#localVideo')[0];
+let localStream;
+let localUserId;
+let connections = [];
 
-var WRTC_CORE = (function () {
-	var loc = document.location;
-	var port = loc.port === "" ? (loc.protocol === "https:" ? 443 : 80) : loc.port;
-	var url = loc.protocol + "//" + loc.hostname + ":" + port;
-	const socket = io.connect(url, { secure: true });
+function gotRemoteStream(event, userId) {
+	let remoteVideo = document.createElement("video");
 
-	const mediaStreamConstraints = {
-		video: true,
-	};
+	remoteVideo.setAttribute("data-socket", userId);
+	remoteVideo.srcObject = event.stream;
+	remoteVideo.autoplay = true;
+	remoteVideo.muted = true;
+	remoteVideo.playsinline = true;
+	remoteVideo.style.width = "150px";
+	$(document).find(".videos").append(remoteVideo);
+}
 
-	const offerOptions = {
-		offerToReceiveVideo: 1,
-	};
-	const localVideo = $(document).find("#localVideo")[0];
-	let localStream;
-	let localUserId;
-	let connections = [];
-	let headerId;
+function gotIceCandidate(fromId, candidate) {
+	connections[fromId]
+		.addIceCandidate(new RTCIceCandidate(candidate))
+		.catch(handleError);
+}
 
-	function gotRemoteStream(event, userId) {
-		let remoteVideo = document.createElement("video");
+function startLocalStream() {
+	navigator.mediaDevices
+		.getUserMedia(mediaStreamConstraints)
+		.then(getUserMediaSuccess)
+		.then(connectSocketToSignaling)
+		.catch(handleError);
+}
 
-		remoteVideo.setAttribute("data-socket", userId);
-		remoteVideo.srcObject = event.stream;
-		remoteVideo.autoplay = true;
-		remoteVideo.muted = true;
-		remoteVideo.playsinline = true;
-		remoteVideo.style.width = "150px";
-		$(document).find(".videos").append(remoteVideo);
-	}
+function connectSocketToSignaling() {
+	const socket = io.connect("http://localhost:3000/", { secure: true });
+	socket.on("connect", () => {
+		localUserId = clientVars.userId;
+		console.log("localUser", localUserId);
 
-	function gotIceCandidate(fromId, candidate) {
-		connections[fromId]
-			.addIceCandidate(new RTCIceCandidate(candidate))
-			.catch(handleError);
-	}
+		socket.on("user-joined", (data) => {
+			// const clients = data.clients;
+			const joinedUserId = data.joinedUserId;
+			console.log(joinedUserId, " joined");
 
-	function startLocalStream(comingheader) {
-		headerId = comingheader
-		navigator.mediaDevices
-			.getUserMedia(mediaStreamConstraints)
-			.then(getUserMediaSuccess)
-			.then(connectSocketToSignaling)
-			.then(() => {})
-			.catch(handleError);
-	}
-
-	function globVideoLeavingRoom() {
-		const headerId = window.headerId;
-		const padId = clientVars.padId;
-		const userId = clientVars.userId;
-		socket.emit("user-leaving", padId, headerId, userId, () => {
-			console.log("socket user leaving");
-		});
-	}
-
-	function connectSocketToSignaling() {
-		// socket.on("connect", () => {
-			localUserId = socket.id;
-			console.log("localUser", localUserId);
-
-			const headerId = window.headerId;
-			const padId = clientVars.padId;
-			const userId = clientVars.userId;
-
-			socket.emit("user-joining", padId, headerId, userId, () => {
-				console.log("user sendddd");
-			});
-
-			socket.on("user-joined", (data) => {
-				const clients = data.clients;
-				const joinedUserId = data.joinedUserId;
-				console.log(joinedUserId, " joined");
 				if (Array.isArray(clients) && clients.length > 0) {
 					clients.forEach((userId) => {
 						if (!connections[userId]) {
-							connections[userId] = new RTCPeerConnection(
-								mediaStreamConstraints
-							);
+							connections[userId] = new RTCPeerConnection(mediaStreamConstraints);
 							connections[userId].onicecandidate = () => {
 								if (event.candidate) {
 									console.log(socket.id, " Send candidate to ", userId);
 									socket.emit("signaling", {
-										headerId: headerId,
 										type: "candidate",
 										candidate: event.candidate,
 										toId: userId,
@@ -961,7 +937,7 @@ var WRTC_CORE = (function () {
 							connections[userId].addStream(localStream);
 						}
 					});
-
+	
 					if (data.count >= 2) {
 						connections[joinedUserId]
 							.createOffer(offerOptions)
@@ -971,7 +947,6 @@ var WRTC_CORE = (function () {
 									.then(() => {
 										console.log(socket.id, " Send offer to ", joinedUserId);
 										socket.emit("signaling", {
-											headerId: headerId,
 											toId: joinedUserId,
 											description: connections[joinedUserId].localDescription,
 											type: "sdp",
@@ -981,133 +956,72 @@ var WRTC_CORE = (function () {
 							});
 					}
 				}
-			});
 
-			socket.on("user-left", (userId) => {
-				console.log("user left", userId)
-				// let video = document.querySelector('[data-socket="'+ userId +'"]');
-				$(document)
-					.find('[data-socket="' + userId + '"]')
-					.remove();
-				if (localStream) share.stopStreaming(localStream);
-				connections[userId] = null
-				delete connections[userId]
-				// video.parentNode.removeChild(video);
-			});
 
-			socket.on("signaling", (data) => {
-				console.log(data, data.headerId === window.headerId)
-				if(data.headerId === window.headerId){
-					gotMessageFromSignaling(socket, data);
+		});
+
+		socket.on("user-left", (userId) => {
+			let video = document.querySelector('[data-socket="' + userId + '"]');
+			video.parentNode.removeChild(video);
+		});
+
+		socket.on("signaling", (data) => {
+			gotMessageFromSignaling(socket, data);
+		});
+	});
+}
+
+function gotMessageFromSignaling(socket, data) {
+	const fromId = data.fromId;
+	if (fromId !== localUserId) {
+		switch (data.type) {
+			case "candidate":
+				console.log(socket.id, " Receive Candidate from ", fromId);
+				if (data.candidate) {
+					gotIceCandidate(fromId, data.candidate);
 				}
-			});
-		// });
-	}
+				break;
 
-	function gotMessageFromSignaling(socket, data) {
-		const fromId = data.fromId;
-		if (fromId !== localUserId) {
-			switch (data.type) {
-				case "candidate":
-					console.log(socket.id, " Receive Candidate from ", fromId);
-					if (data.candidate) {
-						gotIceCandidate(fromId, data.candidate);
-					}
-					break;
-
-				case "sdp":
-					if (data.description) {
-						console.log(socket.id, " Receive sdp from ", fromId);
-						connections[fromId]
-							.setRemoteDescription(new RTCSessionDescription(data.description))
-							.then(() => {
-								if (data.description.type === "offer") {
-									connections[fromId]
-										.createAnswer()
-										.then((description) => {
-											connections[fromId]
-												.setLocalDescription(description)
-												.then(() => {
-													console.log(socket.id, " Send answer to ", fromId);
-													socket.emit("signaling", {
-														type: "sdp",
-														headerId: headerId,
-														toId: fromId,
-														description: connections[fromId].localDescription,
-													});
+			case "sdp":
+				if (data.description) {
+					console.log(socket.id, " Receive sdp from ", fromId);
+					connections[fromId]
+						.setRemoteDescription(new RTCSessionDescription(data.description))
+						.then(() => {
+							if (data.description.type === "offer") {
+								connections[fromId]
+									.createAnswer()
+									.then((description) => {
+										connections[fromId]
+											.setLocalDescription(description)
+											.then(() => {
+												console.log(socket.id, " Send answer to ", fromId);
+												socket.emit("signaling", {
+													type: "sdp",
+													toId: fromId,
+													description: connections[fromId].localDescription,
 												});
-										})
-										.catch(handleError);
-								}
-							})
-							.catch(handleError);
-					}
-					break;
-			}
+											});
+									})
+									.catch(handleError);
+							}
+						})
+						.catch(handleError);
+				}
+				break;
 		}
 	}
+}
 
-	function getUserMediaSuccess(mediaStream) {
-		const localVideo = $(document)
-			.find("#localVideo")
-			.css({ width: "150px" })[0];
-		localStream = mediaStream;
-		console.log(localVideo);
-		localVideo.srcObject = mediaStream;
-	}
+function getUserMediaSuccess(mediaStream) {
+	const localVideo = $(document).find("#localVideo").css({ width: "150px" })[0];
+	localStream = mediaStream;
+	console.log(localVideo);
+	localVideo.srcObject = mediaStream;
+}
 
-	function handleError(error) {
-		// console.log(e);
-		// alert("Something went wrong");
-
-		// attempt to reconnect
-		// console.log(error, functionName, data, "=========logError")
-		if (error && error.message.includes("Failed to set remote answer sdp")) {
-			console.log("Try reconnecting");
-			//setTimeout(() => {
-			console.log("reconnecting...");
-			// self.receiveMessage(data)
-			gState = "RECONNECTING";
-			// share.stopStreaming(localStream)
-			// self.getUserMedia(window.headerId)
-
-			// socket.emit('getHeaderUserlist', window.pad.getPadId(), window.headerId, function(userList){
-			// 	userList.forEach(function (userId) {
-			// 		if (userId !== share.getUserId() ) {
-			// 			// if (pc[userId]) {
-			// 			// 	self.hangup(userId, null, headerId);
-			// 			// }
-			// 			self.call(userId, window.headerId);
-			// 		}
-			// 	});
-			// });
-
-			connectSocketToSignaling();
-
-			// $(document).find("#wrtc_modal .btn_reload.btn_roomHandler").trigger("click")
-			//}, 100);
-		}
-
-		console.error("WebRTC ERROR:", error);
-	}
-
-	return {
-		startLocalStream
-	};
-})();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+function handleError(e) {
+	console.log(e);
+	alert("Something went wrong");
+}
 

@@ -68,14 +68,23 @@ var queue = new TinyQueue();
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration/iceServers
 		// Don't forget to use TURN server, The Stun server is not enough.
-		pcConfig.iceServers = [{
-			'urls': [
+		pcConfig.iceServers = [
+		{'urls': [
 				'stun:stun.l.google.com:19302',
 				'stun:stun1.l.google.com:19302',
 				'stun:stun2.l.google.com:19302',
-				'stun:stun.l.google.com:19302?transport=udp',
+				'stun:stun.l.google.com:19302?transport=udp',,
+				"stun:130.185.122.49:3478"
 			]
-		}];
+		},
+		{url: ["turn:130.185.122.49:3478"], credential: "docsplus", username: "strongPassword"},
+		{
+				url: 'turn:numb.viagenie.ca',
+				credential: 'muazkh',
+				username: 'webrtc@live.com'
+		},
+		{url: "turn:turn.anyfirewall.com:443?transport=tcp", credential: "webrtc", username: "webrtc"}
+		];
 
 		if(clientVars.webrtc && clientVars.webrtc.iceServers) pcConfig.iceServers = clientVars.webrtc.iceServers;
 

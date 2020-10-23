@@ -25,19 +25,90 @@ exports.socketio = function (hookName, args, cb) {
 	Io = io
 	const rooms = {}
 
-	io.on("connect", function (socket) {
-		require('rtcmulticonnection-server').addSocket(socket);
-	})
 
-	io.of("/heading_chat_room").on("connect", function (socket) {
+
+
+
+io.on('connection', function (socket) {
+
+		socket.on('user-joining', (padId, headerId, userId) => {
+			socket.ndHolder = {
+				padId, userId, headerId
+			}
+			socket.client.myname = "Hossein"
+			// socketUserJoin(socket.ndHolder)
+			const userList = videoChat.getUserInHeader(padId, headerId)
+			io.sockets.emit('user-joined', {
+				clients:  Object.keys(io.sockets.clients().sockets), 
+				count: io.engine.clientsCount, 
+				joinedUserId: socket.id
+			});
+
+		})
+
+		socket.on('user-leaving', (padId, headerId, userId) => {
+			io.sockets.emit('user-left', socket.id)
+		})
+		
+		socket.on('signaling', function(data) {
+        io.to(data.toId).emit('signaling', { fromId: socket.id, ...data });
+    });
+    socket.on('disconnect', function() {
+				// if(socket.ndHolder&&socket.ndHolder.userId)
+        	io.sockets.emit('user-left', socket.id)
+    })
+});
+
+
+
+io.of("/heading_chat_room").on("connect", function (socket) {
 
 		require('rtcmulticonnection-server').addSocket(socket);
-	
+
+		// io.sockets.emit('user-joined', { clients:  Object.keys(io.sockets.clients().sockets), count: io.engine.clientsCount, joinedUserId: socket.id});
+		
+		
+		// socket.on('signaling', function(data, padId) {
+    //     io.to(data.toId).emit('signaling', { fromId: socket.id, ...data });
+    // });
+    // socket.on('disconnect', function() {
+    //     io.sockets.emit('user-left', socket.id)
+		// })
+		
+		const socketId = socket.id
+
+		socket.on('user-leaving', (padId, headerId, userId) => {
+			io.sockets.emit('user-left', socket.id)
+		})
+
+		
+		// socket.on('user-joining', (padId, callback) => {
+		// 	console.log(padId, "======", Object.keys(io.sockets.clients().sockets))
+		// 	const data = { 
+		// 		clients:  Object.keys(io.sockets.clients().sockets),
+		// 		count: io.engine.clientsCount,
+		// 		joinedUserId: socketId
+		// 	}
+		// 	socket.emit('user-joined', data);
+		// 	callback(data)
+		// })
+
+		// socket.on('signaling', function(padId, data) {
+		// 	console.log(padId, data, "/heading_chat_room#"+data.toId)
+		// 	io.to(data.toId).emit('signaling', { fromId: socket.id, ...data });
+		// 	// socket.broadcast.emit('signaling', { fromId: socket.id, ...data });
+		// 	// socket.emit('signaling', { fromId: socketId, ...data });
+		// 		// io.of("/heading_chat_room").to(data.toId).emit('signaling', { fromId: socket.id, ...data });
+    // });
+    // socket.on('disconnect', function() {
+    //     io.sockets.emit('user-left', socket.id)
+    // })
 
 		IoSocket = socket
 		socket.on("join pad", function (padId ,userId, callback) {
 			socket.ndHolder = {video: {}, text: {}}
-
+			socket.ndHolder.userId = userId
+			socket.ndHolder.padId = padId
 			socket.ndHolder.video = {userId, padId}
 			socket.ndHolder.text = {userId, padId}
 			socket.join(padId)
@@ -145,35 +216,56 @@ exports.socketio = function (hookName, args, cb) {
 			callback(userList)
 		})
 
-	socket.on('closeForCalling', (padId, headerId, callback) => {
-		// console.log("openForCalling ha ha ha ====", padId, headerId)
-		const roomKey = `${padId}:${headerId}`
-		rooms[roomKey] = false
-		console.log("closeForCalling", rooms[roomKey])
-	})
 
-	socket.on('openForCalling', (padId, headerId, callback) => {
-		// console.log("openForCalling ha ha ha ====", padId, headerId)
-		const roomKey = `${padId}:${headerId}`
-		rooms[roomKey] = true
-		console.log("openForCalling", rooms[roomKey])
-	})
+		// socket.on('user-joining', () => {
 
-	socket.on('canMakeACall', (padId, headerId, callback) => {
-		const roomKey = `${padId}:${headerId}`
-		// if(rooms[roomKey] === undefined)  rooms[roomKey] = true
-		callback(rooms[roomKey])
-		console.log("canMakeACall", rooms[roomKey])
-	})
+		// 	console.log(socket.id.split('#'))
+		// 	socket.to(socket.ndHolder.padId).emit('user-joined', {
+		// 		clients:  Object.keys(io.sockets.clients().sockets),
+		// 		count: io.engine.clientsCount,
+		// 		joinedUserId: socket.id
+		// 	})
+
+		// })
+
+    // socket.on('signaling', function(data) {
+		// 	console.log(data)
+    //   io.to(data.toId).emit('signaling', { fromId: socket.id, ...data });
+    // });
+    // socket.on('disconnect', function() {
+    //     io.sockets.emit('user-left', socket.id)
+    // })
+
+
+		socket.on('closeForCalling', (padId, headerId, callback) => {
+			// console.log("openForCalling ha ha ha ====", padId, headerId)
+			const roomKey = `${padId}:${headerId}`
+			rooms[roomKey] = false
+			console.log("closeForCalling", rooms[roomKey])
+		})
+
+		socket.on('openForCalling', (padId, headerId, callback) => {
+			// console.log("openForCalling ha ha ha ====", padId, headerId)
+			const roomKey = `${padId}:${headerId}`
+			rooms[roomKey] = true
+			console.log("openForCalling", rooms[roomKey])
+		})
+
+		socket.on('canMakeACall', (padId, headerId, callback) => {
+			const roomKey = `${padId}:${headerId}`
+			// if(rooms[roomKey] === undefined)  rooms[roomKey] = true
+			callback(rooms[roomKey])
+			console.log("canMakeACall", rooms[roomKey])
+		})
 
 
 		
-	// Handle wrtc message
-	socket.on('RTC_MESSAGE', (data, callback) => {
+		// Handle wrtc message
+		socket.on('RTC_MESSAGE', (data, callback) => {
 
-			handleRTCMessage(data.client, data.payload)
+				handleRTCMessage(data.client, data.payload)
 
-	})
+		})
 
 
 	})
